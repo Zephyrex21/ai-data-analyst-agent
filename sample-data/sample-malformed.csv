@@ -1,0 +1,7 @@
+date,region,product,units_sold,revenue,in_stock
+2025-01-05,North,Widget A,120,2400.50,yes
+2025-01-06,South,Widget B,85,1700.00
+2025-01-07,East,Widget A,200,4000.00,yes,extra_value_here
+
+2025-01-08,West,Widget C,60,900.75,yes
+2025-01-09,,Widget B,150,3000.00,no

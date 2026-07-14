@@ -1,0 +1,110 @@
+import * as duckdb from "@duckdb/duckdb-wasm";
+
+export interface QueryResult {
+  columns: string[];
+  rows: Record<string, unknown>[];
+}
+
+export class SqlExecutionError extends Error {}
+
+let dbSingleton: duckdb.AsyncDuckDB | null = null;
+let dbInitPromise: Promise<duckdb.AsyncDuckDB> | null = null;
+
+/**
+ * Lazily initializes a single shared AsyncDuckDB instance for the whole app.
+ * Uses the jsDelivr-hosted bundles so we don't need any special Vite/worker
+ * bundling config, and duckdb-wasm auto-selects a bundle that works without
+ * cross-origin-isolation headers (falls back to the MVP bundle).
+ */
+async function getDb(): Promise<duckdb.AsyncDuckDB> {
+  if (dbSingleton) return dbSingleton;
+  if (dbInitPromise) return dbInitPromise;
+
+  dbInitPromise = (async () => {
+    const bundles = duckdb.getJsDelivrBundles();
+    const bundle = await duckdb.selectBundle(bundles);
+
+    const workerUrl = URL.createObjectURL(
+      new Blob([`importScripts("${bundle.mainWorker}");`], {
+        type: "text/javascript",
+      })
+    );
+
+    const worker = new Worker(workerUrl);
+    const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING);
+    const db = new duckdb.AsyncDuckDB(logger, worker);
+    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    URL.revokeObjectURL(workerUrl);
+
+    dbSingleton = db;
+    return db;
+  })();
+
+  return dbInitPromise;
+}
+
+/**
+ * Registers a CSV file's contents as a queryable table (dropping/replacing
+ * any existing table of the same name so re-uploads work cleanly).
+ */
+export async function loadCsvAsTable(file: File, tableName: string): Promise<void> {
+  const db = await getDb();
+  const text = await file.text();
+  const virtualFileName = `${tableName}.csv`;
+
+  await db.registerFileText(virtualFileName, text);
+
+  const conn = await db.connect();
+  try {
+    await conn.query(
+      `CREATE OR REPLACE TABLE ${quoteIdent(tableName)} AS
+       SELECT * FROM read_csv_auto('${virtualFileName}', header=true, sample_size=-1)`
+    );
+  } catch (err) {
+    throw new SqlExecutionError(
+      `DuckDB couldn't load this CSV: ${err instanceof Error ? err.message : String(err)}`
+    );
+  } finally {
+    await conn.close();
+  }
+}
+
+export async function runQuery(sql: string): Promise<QueryResult> {
+  const db = await getDb();
+  const conn = await db.connect();
+  try {
+    const result = await conn.query(sql);
+    const columns = result.schema.fields.map((f) => f.name);
+    const rows = result.toArray().map((row) => serializeRow(row.toJSON(), columns));
+    return { columns, rows };
+  } catch (err) {
+    throw new SqlExecutionError(err instanceof Error ? err.message : String(err));
+  } finally {
+    await conn.close();
+  }
+}
+
+// Arrow can return BigInt (int64) and other non-JSON-safe types; normalize
+// them so the UI can render/serialize results without crashing.
+function serializeRow(
+  row: Record<string, unknown>,
+  columns: string[]
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const col of columns) {
+    const value = row[col];
+    if (typeof value === "bigint") {
+      out[col] = Number.isSafeInteger(Number(value)) ? Number(value) : value.toString();
+    } else if (value instanceof Date) {
+      out[col] = value.toISOString().slice(0, 10);
+    } else {
+      out[col] = value;
+    }
+  }
+  return out;
+}
+
+// Basic identifier quoting so table names with odd characters don't break the query.
+function quoteIdent(ident: string): string {
+  return `"${ident.replace(/"/g, '""')}"`;
+}
