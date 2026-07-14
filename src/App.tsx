@@ -32,7 +32,7 @@ function App() {
           AI Data Analyst Agent
         </h1>
         <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Phase 3 — ask a question in plain English, get a real answer
+          Phase 4 — answers now come with charts
         </p>
       </div>
 

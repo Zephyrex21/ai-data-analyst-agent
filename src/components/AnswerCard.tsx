@@ -1,6 +1,9 @@
 import { useState } from "react";
 import type { AskStage } from "../hooks/useAskQuestion";
 import type { QueryResult } from "../lib/duckdb";
+import { chooseChartType, isSingleScalar } from "../lib/chartSelection";
+import { BigNumberDisplay } from "./BigNumberDisplay";
+import { ResultChart } from "./ResultChart";
 
 interface AnswerCardProps {
   stage: AskStage;
@@ -24,6 +27,8 @@ export function AnswerCard({ stage, question, sql, result, error }: AnswerCardPr
   if (stage === "idle" || !question) return null;
 
   const isBusy = stage === "generating-sql" || stage === "running-query";
+  const chartSpec = result ? chooseChartType(result) : null;
+  const showBigNumber = result ? isSingleScalar(result) : false;
 
   return (
     <div className="glass rounded-2xl p-6 w-full">
@@ -56,6 +61,18 @@ export function AnswerCard({ stage, question, sql, result, error }: AnswerCardPr
               {sql}
             </pre>
           )}
+        </div>
+      )}
+
+      {result && showBigNumber && (
+        <div className="mb-4">
+          <BigNumberDisplay result={result} />
+        </div>
+      )}
+
+      {result && !showBigNumber && chartSpec && (
+        <div className="mb-4">
+          <ResultChart spec={chartSpec} result={result} />
         </div>
       )}
 
