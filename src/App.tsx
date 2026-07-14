@@ -23,7 +23,8 @@ function App() {
     ask.reset();
   }
 
-  const isAskBusy = ask.stage === "generating-sql" || ask.stage === "running-query";
+  const isAskBusy =
+    ask.stage === "generating-sql" || ask.stage === "validating" || ask.stage === "running-query";
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-12 gap-6">
@@ -32,7 +33,7 @@ function App() {
           AI Data Analyst Agent
         </h1>
         <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Phase 4 — answers now come with charts
+          Phase 6 — wrong queries self-correct instead of just failing
         </p>
       </div>
 
@@ -74,6 +75,7 @@ function App() {
           sql={ask.sql}
           result={ask.result}
           error={ask.error}
+          attemptsUsed={ask.attemptsUsed}
         />
       </div>
     </div>

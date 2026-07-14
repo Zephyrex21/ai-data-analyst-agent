@@ -1,17 +1,26 @@
 export class LlmError extends Error {}
 
+export interface PreviousAttempt {
+  sql: string;
+  error: string;
+}
+
 interface GenerateSqlResponse {
   sql?: string;
   error?: string;
 }
 
-export async function generateSql(question: string, schemaDescription: string): Promise<string> {
+export async function generateSql(
+  question: string,
+  schemaDescription: string,
+  previousAttempt?: PreviousAttempt | null
+): Promise<string> {
   let res: Response;
   try {
     res = await fetch("/api/generate-sql", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, schemaDescription }),
+      body: JSON.stringify({ question, schemaDescription, previousAttempt: previousAttempt ?? null }),
     });
   } catch {
     throw new LlmError(

@@ -11,29 +11,38 @@ interface AnswerCardProps {
   sql: string | null;
   result: QueryResult | null;
   error: string | null;
+  attemptsUsed: number;
 }
 
 const STAGE_LABELS: Record<AskStage, string> = {
   idle: "",
   "generating-sql": "Thinking about how to query this…",
+  validating: "Checking the query is safe to run…",
   "running-query": "Running the query…",
   done: "",
   error: "",
 };
 
-export function AnswerCard({ stage, question, sql, result, error }: AnswerCardProps) {
+export function AnswerCard({ stage, question, sql, result, error, attemptsUsed }: AnswerCardProps) {
   const [showSql, setShowSql] = useState(false);
 
   if (stage === "idle" || !question) return null;
 
-  const isBusy = stage === "generating-sql" || stage === "running-query";
+  const isBusy = stage === "generating-sql" || stage === "validating" || stage === "running-query";
   const chartSpec = result ? chooseChartType(result) : null;
   const showBigNumber = result ? isSingleScalar(result) : false;
 
   return (
     <div className="glass rounded-2xl p-6 w-full">
       <p className="text-sm text-[var(--color-text-muted)]">You asked</p>
-      <p className="font-medium text-[var(--color-text)] mb-4">{question}</p>
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <p className="font-medium text-[var(--color-text)]">{question}</p>
+        {stage === "done" && attemptsUsed > 1 && (
+          <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+            Self-corrected after {attemptsUsed} attempts
+          </span>
+        )}
+      </div>
 
       {isBusy && (
         <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
