@@ -1,4 +1,6 @@
 import * as duckdb from "@duckdb/duckdb-wasm";
+import { DataType } from "apache-arrow";
+import type { Field } from "apache-arrow";
 
 export interface QueryResult {
   columns: string[];
@@ -74,8 +76,9 @@ export async function runQuery(sql: string): Promise<QueryResult> {
   const conn = await db.connect();
   try {
     const result = await conn.query(sql);
-    const columns = result.schema.fields.map((f) => f.name);
-    const rows = result.toArray().map((row) => serializeRow(row.toJSON(), columns));
+    const fields = result.schema.fields;
+    const columns = fields.map((f) => f.name);
+    const rows = result.toArray().map((row) => serializeRow(row.toJSON(), fields));
     return { columns, rows };
   } catch (err) {
     throw new SqlExecutionError(err instanceof Error ? err.message : String(err));
@@ -84,16 +87,28 @@ export async function runQuery(sql: string): Promise<QueryResult> {
   }
 }
 
-// Arrow can return BigInt (int64) and other non-JSON-safe types; normalize
-// them so the UI can render/serialize results without crashing.
+// Arrow can return BigInt (int64), raw epoch numbers/Date objects for
+// date/timestamp columns, and other non-JSON-safe types. Normalize them
+// using the actual Arrow field type (not just runtime typeof) so, e.g.,
+// a DATE column reliably renders as "2025-01-05" instead of a raw epoch
+// number like 1736035200000.
 function serializeRow(
   row: Record<string, unknown>,
-  columns: string[]
+  fields: Field[]
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const col of columns) {
+  for (const field of fields) {
+    const col = field.name;
     const value = row[col];
-    if (typeof value === "bigint") {
+
+    if (value === null || value === undefined) {
+      out[col] = value;
+    } else if (DataType.isDate(field.type) || DataType.isTimestamp(field.type)) {
+      const asDate = value instanceof Date ? value : new Date(Number(value));
+      out[col] = DataType.isDate(field.type)
+        ? asDate.toISOString().slice(0, 10)
+        : asDate.toISOString().replace("T", " ").slice(0, 19);
+    } else if (typeof value === "bigint") {
       out[col] = Number.isSafeInteger(Number(value)) ? Number(value) : value.toString();
     } else if (value instanceof Date) {
       out[col] = value.toISOString().slice(0, 10);

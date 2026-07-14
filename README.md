@@ -1,32 +1,26 @@
-# React + TypeScript + Vite
+# AI Data Analyst Agent
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Upload a CSV, ask questions in plain English, get real SQL executed against your data — entirely client-side (DuckDB-WASM) except for the LLM call, which is proxied through a tiny serverless function so the API key never reaches the browser.
 
-Currently, two official plugins are available:
+Zero cost: Vite/React frontend on Vercel's free tier, DuckDB running in-browser via WASM (no backend, no server execution risk), and Groq's free API tier for the LLM.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Local development
 
-## React Compiler
+This project has a Vercel serverless function (`/api/generate-sql.ts`), so plain `npm run dev` will run the frontend but the API route won't work — you need the Vercel CLI:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```
+npm install -g vercel
+npm install
+cp .env.local.example .env.local   # then paste your real Groq key into .env.local
+vercel dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Get a free Groq API key (no card required) at https://console.groq.com.
+
+## Deploying
+
+Push to GitHub, import the repo in Vercel, then add `GROQ_API_KEY` under Project Settings → Environment Variables and redeploy.
+
+## Status
+
+Currently at Phase 3 of the build blueprint: CSV upload + preview, real in-browser SQL execution via DuckDB-WASM, and the core NL-question → LLM-generated SQL → executed-and-shown loop.

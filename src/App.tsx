@@ -1,22 +1,29 @@
 import { useCsvData } from "./hooks/useCsvData";
 import { useDuckDb } from "./hooks/useDuckDb";
+import { useAskQuestion } from "./hooks/useAskQuestion";
 import { FileUpload } from "./components/FileUpload";
 import { DataTable } from "./components/DataTable";
-import { SqlDebugBox } from "./components/SqlDebugBox";
+import { AskBar } from "./components/AskBar";
+import { AnswerCard } from "./components/AnswerCard";
 
 function App() {
   const csv = useCsvData();
   const duckDb = useDuckDb();
+  const ask = useAskQuestion(csv.data);
 
   function handleFileSelected(file: File) {
     csv.loadFile(file);
     duckDb.loadTable(file);
+    ask.reset();
   }
 
   function handleReset() {
     csv.reset();
     duckDb.resetTable();
+    ask.reset();
   }
+
+  const isAskBusy = ask.stage === "generating-sql" || ask.stage === "running-query";
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-12 gap-6">
@@ -25,7 +32,7 @@ function App() {
           AI Data Analyst Agent
         </h1>
         <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Phase 2 — real SQL execution in-browser via DuckDB-WASM
+          Phase 3 — ask a question in plain English, get a real answer
         </p>
       </div>
 
@@ -49,14 +56,25 @@ function App() {
         )}
 
         {csv.data && (
-          <SqlDebugBox
-            isTableReady={duckDb.isTableReady}
-            isQuerying={duckDb.isQuerying}
-            queryError={duckDb.queryError}
-            result={duckDb.result}
-            onRunQuery={duckDb.query}
+          <AskBar
+            onAsk={ask.ask}
+            isBusy={isAskBusy || duckDb.isLoadingTable || !duckDb.isTableReady}
           />
         )}
+
+        {csv.data && duckDb.isLoadingTable && (
+          <p className="text-xs text-[var(--color-text-muted)] text-center">
+            Loading table into DuckDB…
+          </p>
+        )}
+
+        <AnswerCard
+          stage={ask.stage}
+          question={ask.question}
+          sql={ask.sql}
+          result={ask.result}
+          error={ask.error}
+        />
       </div>
     </div>
   );
