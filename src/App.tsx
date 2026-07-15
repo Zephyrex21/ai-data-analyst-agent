@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useCsvData } from "./hooks/useCsvData";
 import { useDuckDb } from "./hooks/useDuckDb";
 import { useAskQuestion } from "./hooks/useAskQuestion";
@@ -7,24 +8,30 @@ import { AskBar } from "./components/AskBar";
 import { AnswerCard } from "./components/AnswerCard";
 
 function App() {
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const csv = useCsvData();
   const duckDb = useDuckDb();
-  const ask = useAskQuestion(csv.data);
+  const ask = useAskQuestion(csv.data, uploadedFile);
 
   function handleFileSelected(file: File) {
+    setUploadedFile(file);
     csv.loadFile(file);
     duckDb.loadTable(file);
     ask.reset();
   }
 
   function handleReset() {
+    setUploadedFile(null);
     csv.reset();
     duckDb.resetTable();
     ask.reset();
   }
 
   const isAskBusy =
-    ask.stage === "generating-sql" || ask.stage === "validating" || ask.stage === "running-query";
+    ask.stage === "generating-sql" ||
+    ask.stage === "validating" ||
+    ask.stage === "loading-python" ||
+    ask.stage === "running-query";
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-12 gap-6">
@@ -33,7 +40,7 @@ function App() {
           AI Data Analyst Agent
         </h1>
         <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Phase 6 — wrong queries self-correct instead of just failing
+          Phase 7 — SQL for most questions, Python for statistical ones
         </p>
       </div>
 
@@ -73,6 +80,7 @@ function App() {
           stage={ask.stage}
           question={ask.question}
           sql={ask.sql}
+          engine={ask.engine}
           result={ask.result}
           error={ask.error}
           attemptsUsed={ask.attemptsUsed}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AskStage } from "../hooks/useAskQuestion";
+import type { Engine } from "../lib/llm";
 import type { QueryResult } from "../lib/duckdb";
 import { chooseChartType, isSingleScalar } from "../lib/chartSelection";
 import { BigNumberDisplay } from "./BigNumberDisplay";
@@ -9,6 +10,7 @@ interface AnswerCardProps {
   stage: AskStage;
   question: string | null;
   sql: string | null;
+  engine: Engine | null;
   result: QueryResult | null;
   error: string | null;
   attemptsUsed: number;
@@ -16,19 +18,37 @@ interface AnswerCardProps {
 
 const STAGE_LABELS: Record<AskStage, string> = {
   idle: "",
-  "generating-sql": "Thinking about how to query this…",
-  validating: "Checking the query is safe to run…",
-  "running-query": "Running the query…",
+  "generating-sql": "Thinking about how to answer this…",
+  validating: "Checking the code is safe to run…",
+  "loading-python": "Starting the Python engine (first time only, ~10-20s)…",
+  "running-query": "Running it…",
   done: "",
   error: "",
 };
 
-export function AnswerCard({ stage, question, sql, result, error, attemptsUsed }: AnswerCardProps) {
-  const [showSql, setShowSql] = useState(false);
+const ENGINE_BADGE_STYLES: Record<Engine, string> = {
+  sql: "bg-blue-100 text-blue-700",
+  python: "bg-amber-100 text-amber-700",
+};
+
+export function AnswerCard({
+  stage,
+  question,
+  sql,
+  engine,
+  result,
+  error,
+  attemptsUsed,
+}: AnswerCardProps) {
+  const [showCode, setShowCode] = useState(false);
 
   if (stage === "idle" || !question) return null;
 
-  const isBusy = stage === "generating-sql" || stage === "validating" || stage === "running-query";
+  const isBusy =
+    stage === "generating-sql" ||
+    stage === "validating" ||
+    stage === "loading-python" ||
+    stage === "running-query";
   const chartSpec = result ? chooseChartType(result) : null;
   const showBigNumber = result ? isSingleScalar(result) : false;
 
@@ -59,13 +79,22 @@ export function AnswerCard({ stage, question, sql, result, error, attemptsUsed }
 
       {sql && (
         <div className="mb-4">
-          <button
-            onClick={() => setShowSql((v) => !v)}
-            className="text-xs font-medium text-[var(--color-accent)] hover:underline"
-          >
-            {showSql ? "Hide generated SQL" : "Show generated SQL"}
-          </button>
-          {showSql && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCode((v) => !v)}
+              className="text-xs font-medium text-[var(--color-accent)] hover:underline"
+            >
+              {showCode ? "Hide generated code" : "Show generated code"}
+            </button>
+            {engine && (
+              <span
+                className={`text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded ${ENGINE_BADGE_STYLES[engine]}`}
+              >
+                {engine === "sql" ? "SQL" : "Python"}
+              </span>
+            )}
+          </div>
+          {showCode && (
             <pre className="mt-2 rounded-lg bg-[var(--color-text)] text-white text-xs p-3 overflow-x-auto whitespace-pre-wrap">
               {sql}
             </pre>

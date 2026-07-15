@@ -13,6 +13,7 @@
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
     "@tailwindcss/vite": "^4.3.2",
     "papaparse": "^5.5.4",
+    "pyodide": "^314.0.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "recharts": "^3.9.2",
