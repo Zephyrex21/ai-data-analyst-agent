@@ -36,6 +36,10 @@ Respond with ONLY a single valid DuckDB SQL SELECT statement that answers the qu
 - Always use the explicit AS keyword when naming an aggregate or expression, e.g.
   SUM(revenue) AS total_revenue, not SUM(revenue) total_revenue.
 - Do not use WITH / CTEs (Common Table Expressions). Write a single flat SELECT query only.
+- If a question asks for a metric that isn't directly derivable from the given columns (e.g. "profit margin"
+  when there's no cost/profit column, "conversion rate" with no visits column), do NOT invent a formula
+  using unrelated columns to produce a placeholder number. A formula like revenue/revenue is not a real
+  answer. In that case respond with exactly: NO_QUERY_POSSIBLE
 - If you are given a "Previous attempt" and its error below, that query failed — do not repeat the
   same mistake. Read the error carefully and fix the specific problem it describes.
 - If the question genuinely cannot be answered using only the given schema, respond with exactly: NO_QUERY_POSSIBLE`;
