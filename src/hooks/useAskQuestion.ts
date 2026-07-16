@@ -1,11 +1,17 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import type { ParsedCsv } from "../lib/csv";
 import { buildSchemaDescription } from "../lib/schema";
 import { generateQuery, LlmError, type Engine, type PreviousAttempt } from "../lib/llm";
 import { validateSql } from "../lib/sqlValidator";
 import { validatePythonCode } from "../lib/pythonValidator";
 import { runQuery, type QueryResult } from "../lib/duckdb";
-import { loadCsvIntoDataframe, runPythonCode, PythonExecutionError } from "../lib/pyodide";
+import {
+  loadCsvIntoDataframe,
+  runPythonCode,
+  isDataFrameLoaded,
+  resetPythonState,
+  PythonExecutionError,
+} from "../lib/pyodide";
 
 export type AskStage =
   | "idle"
@@ -41,10 +47,6 @@ const IDLE_STATE: AskState = {
 
 export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
   const [state, setState] = useState<AskState>(IDLE_STATE);
-  // Tracks which File the Python DataFrame was last loaded from, so we only
-  // pay the (large) Pyodide download/init cost once per uploaded file, and
-  // only if a question actually routes to Python at all.
-  const pyodideLoadedForFileRef = useRef<File | null>(null);
 
   const ask = useCallback(
     async (question: string) => {
@@ -125,10 +127,9 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
           }
 
           try {
-            if (pyodideLoadedForFileRef.current !== file) {
+            if (!isDataFrameLoaded(file)) {
               setState((s) => ({ ...s, stage: "loading-python" }));
               await loadCsvIntoDataframe(file);
-              pyodideLoadedForFileRef.current = file;
             }
 
             setState((s) => ({ ...s, stage: "running-query" }));
@@ -161,7 +162,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
 
   const reset = useCallback(() => {
     setState(IDLE_STATE);
-    pyodideLoadedForFileRef.current = null;
+    resetPythonState();
   }, []);
 
   return { ...state, ask, reset };

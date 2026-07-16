@@ -1,84 +1,97 @@
-import { loadPyodide, type PyodideAPI } from "pyodide";
-
-// Must match the installed npm "pyodide" package version — the JS loader and
-// the CDN-hosted runtime/package files have to be the same version.
-const PYODIDE_VERSION = "314.0.2";
-const PYODIDE_CDN_INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
-
 export class PythonExecutionError extends Error {}
-
-let instance: PyodideAPI | null = null;
-let initPromise: Promise<PyodideAPI> | null = null;
-
-/**
- * Lazily initializes a single shared Pyodide instance for the whole app.
- * Unlike DuckDB (loaded on every CSV upload), this is only initialized the
- * first time a question actually routes to the Python engine — Pyodide +
- * pandas is a multi-megabyte download, and most questions never need it.
- */
-async function getPyodide(): Promise<PyodideAPI> {
-  if (instance) return instance;
-  if (initPromise) return initPromise;
-
-  initPromise = (async () => {
-    const pyodide = await loadPyodide({ indexURL: PYODIDE_CDN_INDEX_URL });
-    await pyodide.loadPackage(["pandas"]);
-    instance = pyodide;
-    return pyodide;
-  })();
-
-  return initPromise;
-}
-
-/** Loads the CSV's contents into a pandas DataFrame available as `df` in Python. */
-export async function loadCsvIntoDataframe(file: File): Promise<void> {
-  const pyodide = await getPyodide();
-  const text = await file.text();
-  pyodide.globals.set("_csv_text", text);
-  await pyodide.runPythonAsync(`
-import pandas as pd
-import io as _io
-df = pd.read_csv(_io.StringIO(_csv_text))
-`);
-}
 
 export interface PythonResult {
   columns: string[];
   rows: Record<string, unknown>[];
 }
 
+interface PendingRequest {
+  resolve: (value: string | undefined) => void;
+  reject: (error: Error) => void;
+}
+
+let worker: Worker | null = null;
+let nextRequestId = 1;
+const pending = new Map<number, PendingRequest>();
+// Tracks which File is currently loaded as `df` in the live worker. Reset on
+// worker crash so a stale "already loaded" assumption can't survive a
+// worker being silently replaced underneath it.
+let loadedFile: File | null = null;
+
 /**
- * Executes model-generated Python code against the already-loaded `df`.
- * Real sandboxing here comes from the browser/WASM boundary itself — Pyodide
- * has no real OS filesystem or network access regardless of what the code
- * tries to do. lib/pythonValidator.ts adds a second layer on top of that,
- * mainly to fail fast with a clear reason rather than a confusing runtime
- * error, and to keep the code on the pattern this app actually supports.
+ * Lazily creates a single shared Worker running Pyodide off the main thread
+ * (see pyodideWorker.ts). Only created the first time a question actually
+ * routes to Python — most questions never need it, and it's a heavy download.
+ * Running it in a Worker (the same pattern DuckDB-WASM already uses
+ * internally) keeps the UI responsive during load and execution instead of
+ * freezing while WASM initializes on the main thread.
  */
+function getWorker(): Worker {
+  if (worker) return worker;
+
+  worker = new Worker(new URL("../pyodideWorker.ts", import.meta.url), { type: "module" });
+
+  worker.onmessage = (event: MessageEvent) => {
+    const { id, ok, result, error } = event.data ?? {};
+    const entry = pending.get(id);
+    if (!entry) return;
+    pending.delete(id);
+    if (ok) entry.resolve(result);
+    else entry.reject(new PythonExecutionError(error ?? "Python execution failed."));
+  };
+
+  worker.onerror = (event) => {
+    const message = event.message || "The Python worker crashed unexpectedly.";
+    for (const [id, entry] of pending) {
+      entry.reject(new PythonExecutionError(message));
+      pending.delete(id);
+    }
+    // The worker is in an unknown state after a crash — drop it so the next
+    // call creates a fresh one instead of talking to a dead worker forever.
+    worker = null;
+    loadedFile = null;
+  };
+
+  return worker;
+}
+
+function sendToWorker(type: "loadCsv" | "runCode", payload: string): Promise<string | undefined> {
+  const w = getWorker();
+  const id = nextRequestId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    w.postMessage({ id, type, payload });
+  });
+}
+
+/** Whether this exact File is already loaded as `df` in the current worker. */
+export function isDataFrameLoaded(file: File): boolean {
+  return loadedFile === file;
+}
+
+/**
+ * Loads the CSV's contents into a pandas DataFrame available as `df` in
+ * Python. Safe to call before every Python question — it's a no-op if this
+ * exact File is already loaded into the current worker.
+ */
+export async function loadCsvIntoDataframe(file: File): Promise<void> {
+  if (loadedFile === file) return;
+  const text = await file.text();
+  await sendToWorker("loadCsv", text);
+  loadedFile = file;
+}
+
+/** Forces the next loadCsvIntoDataframe call to actually reload, e.g. after the app-level reset. */
+export function resetPythonState(): void {
+  loadedFile = null;
+}
+
+/** Executes model-generated Python code against the already-loaded `df`. */
 export async function runPythonCode(code: string): Promise<PythonResult> {
-  const pyodide = await getPyodide();
-  try {
-    await pyodide.runPythonAsync(code);
-
-    const jsonResult = await pyodide.runPythonAsync(`
-import pandas as pd
-import json as _json
-
-def _serialize(_value):
-    if isinstance(_value, pd.DataFrame):
-        return _value.to_json(orient="records", date_format="iso")
-    if isinstance(_value, pd.Series):
-        return _value.reset_index().to_json(orient="records", date_format="iso")
-    return _json.dumps([{"result": _value}])
-
-_serialize(result)
-`);
-
-    const parsed = JSON.parse(jsonResult as string);
-    const rows: Record<string, unknown>[] = Array.isArray(parsed) ? parsed : [parsed];
-    const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
-    return { columns, rows };
-  } catch (err) {
-    throw new PythonExecutionError(err instanceof Error ? err.message : String(err));
+  const raw = await sendToWorker("runCode", code);
+  if (!raw) {
+    throw new PythonExecutionError("Python worker returned no result.");
   }
+  const parsed = JSON.parse(raw) as { columns: string[]; records: Record<string, unknown>[] };
+  return { columns: parsed.columns, rows: parsed.records };
 }
