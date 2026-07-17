@@ -13,10 +13,18 @@ interface PreviousAttempt {
   error: string;
 }
 
+interface HistoryTurn {
+  question: string;
+  engine: Engine;
+  code: string;
+  resultSummary: string;
+}
+
 interface RequestBody {
   question?: string;
   schemaDescription?: string;
   previousAttempt?: PreviousAttempt | null;
+  history?: HistoryTurn[];
 }
 
 const SYSTEM_PROMPT = `You are a data analysis assistant. Given a table schema and a question in plain English,
@@ -61,7 +69,15 @@ Both engines — this rule applies either way:
   when there's no cost/profit column), do NOT invent a formula using unrelated columns to fake a placeholder
   number. In that case respond with {"error": "NO_QUERY_POSSIBLE"}.
 - If given a "Previous attempt" and its error below, that attempt failed — do not repeat the same mistake.
-  Read the error and fix the specific problem it describes. You may switch engines if that would fix it.`;
+  Read the error and fix the specific problem it describes. You may switch engines if that would fix it.
+- You may be given a "Conversation history" of earlier questions in this session, each with the code that
+  answered it and a summary of the result. Use it ONLY to resolve references like "that", "it", "those",
+  "break it down further", or "now filter to just X" — figure out what the person means, then write a
+  complete, standalone, self-contained query that answers the CURRENT question from scratch against the
+  full table. Never assume any variable, temp table, or prior result persists — it doesn't. If the current
+  question is unrelated to the history, ignore the history entirely and answer it fresh.`;
+
+const MAX_HISTORY_TURNS = 5;
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== "POST") {
@@ -86,12 +102,26 @@ export default async function handler(req: Request): Promise<Response> {
     return jsonResponse({ error: "Invalid request body." }, 400);
   }
 
-  const { question, schemaDescription, previousAttempt } = body;
+  const { question, schemaDescription, previousAttempt, history } = body;
   if (!question?.trim() || !schemaDescription?.trim()) {
     return jsonResponse({ error: "Missing question or schemaDescription." }, 400);
   }
 
-  let userPrompt = `Schema:\n${schemaDescription}\n\nQuestion: ${question}`;
+  let userPrompt = `Schema:\n${schemaDescription}`;
+
+  if (history && history.length > 0) {
+    const recentHistory = history.slice(-MAX_HISTORY_TURNS);
+    const historyText = recentHistory
+      .map(
+        (turn, i) =>
+          `Turn ${i + 1}:\nQ: ${turn.question}\nEngine: ${turn.engine}\nCode: ${turn.code}\nResult: ${turn.resultSummary}`
+      )
+      .join("\n\n");
+    userPrompt += `\n\nConversation history (most recent last):\n${historyText}`;
+  }
+
+  userPrompt += `\n\nQuestion: ${question}`;
+
   if (previousAttempt?.code && previousAttempt?.error) {
     const engineLabel = previousAttempt.engine ?? "sql";
     userPrompt += `\n\nPrevious attempt (engine: ${engineLabel}, this failed, do not repeat it):\n${previousAttempt.code}\n\nError from that attempt:\n${previousAttempt.error}\n\nWrite a corrected response.`;

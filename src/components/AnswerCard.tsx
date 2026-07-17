@@ -1,23 +1,15 @@
 import { useState } from "react";
-import type { AskStage } from "../hooks/useAskQuestion";
+import type { AskStage, ConversationTurn } from "../hooks/useAskQuestion";
 import type { Engine } from "../lib/llm";
-import type { QueryResult } from "../lib/duckdb";
 import { chooseChartType, isSingleScalar } from "../lib/chartSelection";
 import { BigNumberDisplay } from "./BigNumberDisplay";
 import { ResultChart } from "./ResultChart";
 
 interface AnswerCardProps {
-  stage: AskStage;
-  question: string | null;
-  sql: string | null;
-  engine: Engine | null;
-  result: QueryResult | null;
-  error: string | null;
-  attemptsUsed: number;
+  turn: ConversationTurn;
 }
 
 const STAGE_LABELS: Record<AskStage, string> = {
-  idle: "",
   "generating-sql": "Thinking about how to answer this…",
   validating: "Checking the code is safe to run…",
   "loading-python": "Starting the Python engine (first time only, ~10-20s)…",
@@ -31,18 +23,9 @@ const ENGINE_BADGE_STYLES: Record<Engine, string> = {
   python: "bg-amber-100 text-amber-700",
 };
 
-export function AnswerCard({
-  stage,
-  question,
-  sql,
-  engine,
-  result,
-  error,
-  attemptsUsed,
-}: AnswerCardProps) {
+export function AnswerCard({ turn }: AnswerCardProps) {
   const [showCode, setShowCode] = useState(false);
-
-  if (stage === "idle" || !question) return null;
+  const { stage, question, sql, engine, result, error, attemptsUsed } = turn;
 
   const isBusy =
     stage === "generating-sql" ||

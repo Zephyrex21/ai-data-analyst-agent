@@ -27,12 +27,6 @@ function App() {
     ask.reset();
   }
 
-  const isAskBusy =
-    ask.stage === "generating-sql" ||
-    ask.stage === "validating" ||
-    ask.stage === "loading-python" ||
-    ask.stage === "running-query";
-
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-12 gap-6">
       <div className="text-center">
@@ -40,7 +34,7 @@ function App() {
           AI Data Analyst Agent
         </h1>
         <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Phase 7 — SQL for most questions, Python for statistical ones
+          Phase 8 — follow-up questions understand what "that" means
         </p>
       </div>
 
@@ -66,7 +60,7 @@ function App() {
         {csv.data && (
           <AskBar
             onAsk={ask.ask}
-            isBusy={isAskBusy || duckDb.isLoadingTable || !duckDb.isTableReady}
+            isBusy={ask.isBusy || duckDb.isLoadingTable || !duckDb.isTableReady}
           />
         )}
 
@@ -76,15 +70,9 @@ function App() {
           </p>
         )}
 
-        <AnswerCard
-          stage={ask.stage}
-          question={ask.question}
-          sql={ask.sql}
-          engine={ask.engine}
-          result={ask.result}
-          error={ask.error}
-          attemptsUsed={ask.attemptsUsed}
-        />
+        {ask.turns.map((turn) => (
+          <AnswerCard key={turn.id} turn={turn} />
+        ))}
       </div>
     </div>
   );

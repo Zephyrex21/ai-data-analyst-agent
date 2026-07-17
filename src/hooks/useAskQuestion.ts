@@ -1,7 +1,13 @@
 import { useCallback, useState } from "react";
 import type { ParsedCsv } from "../lib/csv";
-import { buildSchemaDescription } from "../lib/schema";
-import { generateQuery, LlmError, type Engine, type PreviousAttempt } from "../lib/llm";
+import { buildSchemaDescription, summarizeResultForHistory } from "../lib/schema";
+import {
+  generateQuery,
+  LlmError,
+  type Engine,
+  type PreviousAttempt,
+  type HistoryTurn,
+} from "../lib/llm";
 import { validateSql } from "../lib/sqlValidator";
 import { validatePythonCode } from "../lib/pythonValidator";
 import { runQuery, type QueryResult } from "../lib/duckdb";
@@ -14,7 +20,6 @@ import {
 } from "../lib/pyodide";
 
 export type AskStage =
-  | "idle"
   | "generating-sql"
   | "validating"
   | "loading-python"
@@ -24,10 +29,15 @@ export type AskStage =
 
 // 1 initial attempt + 2 self-correction retries, per the build blueprint.
 const MAX_ATTEMPTS = 3;
+// How many prior turns get sent to the model as conversation context.
+const MAX_HISTORY_TURNS = 5;
 
-interface AskState {
+let nextTurnId = 1;
+
+export interface ConversationTurn {
+  id: number;
   stage: AskStage;
-  question: string | null;
+  question: string;
   sql: string | null;
   engine: Engine | null;
   result: QueryResult | null;
@@ -35,24 +45,49 @@ interface AskState {
   attemptsUsed: number;
 }
 
-const IDLE_STATE: AskState = {
-  stage: "idle",
-  question: null,
-  sql: null,
-  engine: null,
-  result: null,
-  error: null,
-  attemptsUsed: 0,
-};
+function updateTurn(
+  turns: ConversationTurn[],
+  id: number,
+  patch: Partial<ConversationTurn>
+): ConversationTurn[] {
+  return turns.map((t) => (t.id === id ? { ...t, ...patch } : t));
+}
 
 export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
-  const [state, setState] = useState<AskState>(IDLE_STATE);
+  const [turns, setTurns] = useState<ConversationTurn[]>([]);
+
+  const isBusy = turns.length > 0 && !["done", "error"].includes(turns[turns.length - 1].stage);
 
   const ask = useCallback(
     async (question: string) => {
-      if (!csvData || !file || !question.trim()) return;
+      if (!csvData || !file || !question.trim() || isBusy) return;
 
-      setState({ ...IDLE_STATE, stage: "generating-sql", question });
+      const id = nextTurnId++;
+      const newTurn: ConversationTurn = {
+        id,
+        stage: "generating-sql",
+        question,
+        sql: null,
+        engine: null,
+        result: null,
+        error: null,
+        attemptsUsed: 0,
+      };
+
+      // Built from `turns` (state read directly from the closure, not via a
+      // setState-updater side effect — updater functions must stay pure,
+      // since React can invoke them more than once in StrictMode dev).
+      const history: HistoryTurn[] = turns
+        .filter((t) => t.stage === "done" && t.engine && t.sql && t.result)
+        .slice(-MAX_HISTORY_TURNS)
+        .map((t) => ({
+          question: t.question,
+          engine: t.engine as Engine,
+          code: t.sql as string,
+          resultSummary: summarizeResultForHistory(t.result as QueryResult),
+        }));
+
+      setTurns((prev) => [...prev, newTurn]);
 
       const schemaDescription = buildSchemaDescription(csvData);
       let previousAttempt: PreviousAttempt | null = null;
@@ -61,20 +96,17 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         let engine: Engine;
         let code: string;
         try {
-          setState((s) => ({ ...s, stage: "generating-sql" }));
-          const generated = await generateQuery(question, schemaDescription, previousAttempt);
+          setTurns((prev) => updateTurn(prev, id, { stage: "generating-sql" }));
+          const generated = await generateQuery(question, schemaDescription, previousAttempt, history);
           engine = generated.engine;
           code = generated.code;
         } catch (err) {
-          // A failure to even reach the LLM (network/server/API-key issue) isn't
-          // something retrying will fix — fail immediately rather than burning
-          // more Groq calls on a problem that won't self-correct.
           const message = err instanceof LlmError ? err.message : "Failed to reach the LLM.";
-          setState((s) => ({ ...s, stage: "error", error: message }));
+          setTurns((prev) => updateTurn(prev, id, { stage: "error", error: message }));
           return;
         }
 
-        setState((s) => ({ ...s, stage: "validating", sql: code, engine }));
+        setTurns((prev) => updateTurn(prev, id, { stage: "validating", sql: code, engine }));
 
         if (engine === "sql") {
           const validation = validateSql(code, csvData);
@@ -84,18 +116,19 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
               previousAttempt = { engine, code, error: reason };
               continue;
             }
-            setState((s) => ({
-              ...s,
-              stage: "error",
-              error: `Couldn't find a safe, working query after ${MAX_ATTEMPTS} attempts. Last issue: ${reason}`,
-            }));
+            setTurns((prev) =>
+              updateTurn(prev, id, {
+                stage: "error",
+                error: `Couldn't find a safe, working query after ${MAX_ATTEMPTS} attempts. Last issue: ${reason}`,
+              })
+            );
             return;
           }
 
-          setState((s) => ({ ...s, stage: "running-query", sql: validation.sql }));
+          setTurns((prev) => updateTurn(prev, id, { stage: "running-query", sql: validation.sql }));
           try {
             const result = await runQuery(validation.sql);
-            setState((s) => ({ ...s, stage: "done", result, attemptsUsed: attempt }));
+            setTurns((prev) => updateTurn(prev, id, { stage: "done", result, attemptsUsed: attempt }));
             return;
           } catch (err) {
             const message = err instanceof Error ? err.message : "Query execution failed.";
@@ -103,11 +136,12 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
               previousAttempt = { engine, code, error: message };
               continue;
             }
-            setState((s) => ({
-              ...s,
-              stage: "error",
-              error: `Couldn't find a working query after ${MAX_ATTEMPTS} attempts. Last error: ${message}`,
-            }));
+            setTurns((prev) =>
+              updateTurn(prev, id, {
+                stage: "error",
+                error: `Couldn't find a working query after ${MAX_ATTEMPTS} attempts. Last error: ${message}`,
+              })
+            );
             return;
           }
         } else {
@@ -118,23 +152,24 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
               previousAttempt = { engine, code, error: reason };
               continue;
             }
-            setState((s) => ({
-              ...s,
-              stage: "error",
-              error: `Couldn't find safe, working Python code after ${MAX_ATTEMPTS} attempts. Last issue: ${reason}`,
-            }));
+            setTurns((prev) =>
+              updateTurn(prev, id, {
+                stage: "error",
+                error: `Couldn't find safe, working Python code after ${MAX_ATTEMPTS} attempts. Last issue: ${reason}`,
+              })
+            );
             return;
           }
 
           try {
             if (!isDataFrameLoaded(file)) {
-              setState((s) => ({ ...s, stage: "loading-python" }));
+              setTurns((prev) => updateTurn(prev, id, { stage: "loading-python" }));
               await loadCsvIntoDataframe(file);
             }
 
-            setState((s) => ({ ...s, stage: "running-query" }));
+            setTurns((prev) => updateTurn(prev, id, { stage: "running-query" }));
             const result = await runPythonCode(code);
-            setState((s) => ({ ...s, stage: "done", result, attemptsUsed: attempt }));
+            setTurns((prev) => updateTurn(prev, id, { stage: "done", result, attemptsUsed: attempt }));
             return;
           } catch (err) {
             const message =
@@ -147,23 +182,24 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
               previousAttempt = { engine, code, error: message };
               continue;
             }
-            setState((s) => ({
-              ...s,
-              stage: "error",
-              error: `Couldn't get working Python code after ${MAX_ATTEMPTS} attempts. Last error: ${message}`,
-            }));
+            setTurns((prev) =>
+              updateTurn(prev, id, {
+                stage: "error",
+                error: `Couldn't get working Python code after ${MAX_ATTEMPTS} attempts. Last error: ${message}`,
+              })
+            );
             return;
           }
         }
       }
     },
-    [csvData, file]
+    [csvData, file, isBusy, turns]
   );
 
   const reset = useCallback(() => {
-    setState(IDLE_STATE);
+    setTurns([]);
     resetPythonState();
   }, []);
 
-  return { ...state, ask, reset };
+  return { turns, isBusy, ask, reset };
 }

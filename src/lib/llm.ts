@@ -8,6 +8,13 @@ export interface PreviousAttempt {
   error: string;
 }
 
+export interface HistoryTurn {
+  question: string;
+  engine: Engine;
+  code: string;
+  resultSummary: string;
+}
+
 export interface GeneratedQuery {
   engine: Engine;
   code: string;
@@ -22,14 +29,20 @@ interface GenerateQueryResponse {
 export async function generateQuery(
   question: string,
   schemaDescription: string,
-  previousAttempt?: PreviousAttempt | null
+  previousAttempt?: PreviousAttempt | null,
+  history?: HistoryTurn[]
 ): Promise<GeneratedQuery> {
   let res: Response;
   try {
     res = await fetch("/api/generate-query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, schemaDescription, previousAttempt: previousAttempt ?? null }),
+      body: JSON.stringify({
+        question,
+        schemaDescription,
+        previousAttempt: previousAttempt ?? null,
+        history: history ?? [],
+      }),
     });
   } catch {
     throw new LlmError(
