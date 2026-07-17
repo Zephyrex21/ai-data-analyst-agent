@@ -1,34 +1,18 @@
 import { useCallback, useState } from "react";
 import type { ParsedCsv } from "../lib/csv";
-import { buildSchemaDescription, summarizeResultForHistory } from "../lib/schema";
-import {
-  generateQuery,
-  LlmError,
-  type Engine,
-  type PreviousAttempt,
-  type HistoryTurn,
-} from "../lib/llm";
-import { validateSql } from "../lib/sqlValidator";
-import { validatePythonCode } from "../lib/pythonValidator";
+import { summarizeResultForHistory } from "../lib/schema";
+import { generateQuery, type Engine, type HistoryTurn } from "../lib/llm";
 import { runQuery, type QueryResult } from "../lib/duckdb";
 import {
   loadCsvIntoDataframe,
   runPythonCode,
   isDataFrameLoaded,
   resetPythonState,
-  PythonExecutionError,
 } from "../lib/pyodide";
+import { runQueryWithRetries, type OrchestratorStage } from "../lib/queryOrchestrator";
 
-export type AskStage =
-  | "generating-sql"
-  | "validating"
-  | "loading-python"
-  | "running-query"
-  | "done"
-  | "error";
+export type AskStage = OrchestratorStage;
 
-// 1 initial attempt + 2 self-correction retries, per the build blueprint.
-const MAX_ATTEMPTS = 3;
 // How many prior turns get sent to the model as conversation context.
 const MAX_HISTORY_TURNS = 5;
 
@@ -74,9 +58,6 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         attemptsUsed: 0,
       };
 
-      // Built from `turns` (state read directly from the closure, not via a
-      // setState-updater side effect — updater functions must stay pure,
-      // since React can invoke them more than once in StrictMode dev).
       const history: HistoryTurn[] = turns
         .filter((t) => t.stage === "done" && t.engine && t.sql && t.result)
         .slice(-MAX_HISTORY_TURNS)
@@ -89,108 +70,16 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
 
       setTurns((prev) => [...prev, newTurn]);
 
-      const schemaDescription = buildSchemaDescription(csvData);
-      let previousAttempt: PreviousAttempt | null = null;
+      const generator = runQueryWithRetries(question, csvData, history, {
+        generateQuery,
+        runSql: runQuery,
+        runPython: runPythonCode,
+        isDataFrameLoaded: () => isDataFrameLoaded(file),
+        loadDataFrame: () => loadCsvIntoDataframe(file),
+      });
 
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        let engine: Engine;
-        let code: string;
-        try {
-          setTurns((prev) => updateTurn(prev, id, { stage: "generating-sql" }));
-          const generated = await generateQuery(question, schemaDescription, previousAttempt, history);
-          engine = generated.engine;
-          code = generated.code;
-        } catch (err) {
-          const message = err instanceof LlmError ? err.message : "Failed to reach the LLM.";
-          setTurns((prev) => updateTurn(prev, id, { stage: "error", error: message }));
-          return;
-        }
-
-        setTurns((prev) => updateTurn(prev, id, { stage: "validating", sql: code, engine }));
-
-        if (engine === "sql") {
-          const validation = validateSql(code, csvData);
-          if (!validation.valid) {
-            const reason = validation.reason ?? "Query was rejected for safety reasons.";
-            if (attempt < MAX_ATTEMPTS) {
-              previousAttempt = { engine, code, error: reason };
-              continue;
-            }
-            setTurns((prev) =>
-              updateTurn(prev, id, {
-                stage: "error",
-                error: `Couldn't find a safe, working query after ${MAX_ATTEMPTS} attempts. Last issue: ${reason}`,
-              })
-            );
-            return;
-          }
-
-          setTurns((prev) => updateTurn(prev, id, { stage: "running-query", sql: validation.sql }));
-          try {
-            const result = await runQuery(validation.sql);
-            setTurns((prev) => updateTurn(prev, id, { stage: "done", result, attemptsUsed: attempt }));
-            return;
-          } catch (err) {
-            const message = err instanceof Error ? err.message : "Query execution failed.";
-            if (attempt < MAX_ATTEMPTS) {
-              previousAttempt = { engine, code, error: message };
-              continue;
-            }
-            setTurns((prev) =>
-              updateTurn(prev, id, {
-                stage: "error",
-                error: `Couldn't find a working query after ${MAX_ATTEMPTS} attempts. Last error: ${message}`,
-              })
-            );
-            return;
-          }
-        } else {
-          const validation = validatePythonCode(code);
-          if (!validation.valid) {
-            const reason = validation.reason ?? "Code was rejected for safety reasons.";
-            if (attempt < MAX_ATTEMPTS) {
-              previousAttempt = { engine, code, error: reason };
-              continue;
-            }
-            setTurns((prev) =>
-              updateTurn(prev, id, {
-                stage: "error",
-                error: `Couldn't find safe, working Python code after ${MAX_ATTEMPTS} attempts. Last issue: ${reason}`,
-              })
-            );
-            return;
-          }
-
-          try {
-            if (!isDataFrameLoaded(file)) {
-              setTurns((prev) => updateTurn(prev, id, { stage: "loading-python" }));
-              await loadCsvIntoDataframe(file);
-            }
-
-            setTurns((prev) => updateTurn(prev, id, { stage: "running-query" }));
-            const result = await runPythonCode(code);
-            setTurns((prev) => updateTurn(prev, id, { stage: "done", result, attemptsUsed: attempt }));
-            return;
-          } catch (err) {
-            const message =
-              err instanceof PythonExecutionError
-                ? err.message
-                : err instanceof Error
-                  ? err.message
-                  : "Python execution failed.";
-            if (attempt < MAX_ATTEMPTS) {
-              previousAttempt = { engine, code, error: message };
-              continue;
-            }
-            setTurns((prev) =>
-              updateTurn(prev, id, {
-                stage: "error",
-                error: `Couldn't get working Python code after ${MAX_ATTEMPTS} attempts. Last error: ${message}`,
-              })
-            );
-            return;
-          }
-        }
+      for await (const update of generator) {
+        setTurns((prev) => updateTurn(prev, id, update));
       }
     },
     [csvData, file, isBusy, turns]
