@@ -6,26 +6,40 @@ import { FileUpload } from "./components/FileUpload";
 import { DataTable } from "./components/DataTable";
 import { AskBar } from "./components/AskBar";
 import { AnswerCard } from "./components/AnswerCard";
+import { SampleQuestions } from "./components/SampleQuestions";
 
 function App() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isSampleData, setIsSampleData] = useState(false);
   const csv = useCsvData();
   const duckDb = useDuckDb();
   const ask = useAskQuestion(csv.data, uploadedFile);
 
-  function handleFileSelected(file: File) {
+  function loadFile(file: File, isSample: boolean) {
     setUploadedFile(file);
+    setIsSampleData(isSample);
     csv.loadFile(file);
     duckDb.loadTable(file);
     ask.reset();
   }
 
+  function handleFileSelected(file: File) {
+    loadFile(file, false);
+  }
+
+  function handleSampleSelected(file: File) {
+    loadFile(file, true);
+  }
+
   function handleReset() {
     setUploadedFile(null);
+    setIsSampleData(false);
     csv.reset();
     duckDb.resetTable();
     ask.reset();
   }
+
+  const isBusy = ask.isBusy || duckDb.isLoadingTable || !duckDb.isTableReady;
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-8 sm:py-12 gap-6">
@@ -40,7 +54,11 @@ function App() {
 
       <div className="w-full max-w-4xl flex flex-col gap-6">
         {!csv.data && (
-          <FileUpload onFileSelected={handleFileSelected} isLoading={csv.isLoading} />
+          <FileUpload
+            onFileSelected={handleFileSelected}
+            onSampleSelected={handleSampleSelected}
+            isLoading={csv.isLoading}
+          />
         )}
 
         {csv.error && (
@@ -57,11 +75,10 @@ function App() {
           </div>
         )}
 
-        {csv.data && (
-          <AskBar
-            onAsk={ask.ask}
-            isBusy={ask.isBusy || duckDb.isLoadingTable || !duckDb.isTableReady}
-          />
+        {csv.data && <AskBar onAsk={ask.ask} isBusy={isBusy} />}
+
+        {csv.data && isSampleData && ask.turns.length === 0 && (
+          <SampleQuestions onAsk={ask.ask} isBusy={isBusy} />
         )}
 
         {csv.data && duckDb.isLoadingTable && (
