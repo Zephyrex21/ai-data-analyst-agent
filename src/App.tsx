@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useCsvData } from "./hooks/useCsvData";
 import { useDuckDb } from "./hooks/useDuckDb";
 import { useAskQuestion } from "./hooks/useAskQuestion";
@@ -12,17 +12,6 @@ function App() {
   const csv = useCsvData();
   const duckDb = useDuckDb();
   const ask = useAskQuestion(csv.data, uploadedFile);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  // Scroll the newest question into view as soon as it's asked, so the
-  // person doesn't have to manually scroll down after every question.
-  // Keyed on turns.length (not the whole array) so this fires once per new
-  // turn, not on every stage update within the same turn.
-  useEffect(() => {
-    if (ask.turns.length > 0) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
-  }, [ask.turns.length]);
 
   function handleFileSelected(file: File) {
     setUploadedFile(file);
@@ -81,10 +70,12 @@ function App() {
           </p>
         )}
 
-        {ask.turns.map((turn) => (
-          <AnswerCard key={turn.id} turn={turn} />
-        ))}
-        <div ref={bottomRef} />
+        {ask.turns
+          .map((turn, i) => ({ turn, number: i + 1 }))
+          .reverse()
+          .map(({ turn, number }) => (
+            <AnswerCard key={turn.id} turn={turn} number={number} />
+          ))}
       </div>
     </div>
   );
