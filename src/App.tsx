@@ -39,13 +39,13 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 py-12 gap-6">
+    <div className="min-h-screen flex flex-col items-center px-4 py-8 sm:py-12 gap-6">
       <div className="text-center">
         <h1 className="text-2xl font-semibold text-[var(--color-text)]">
           AI Data Analyst Agent
         </h1>
         <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Phase 8 — follow-up questions understand what "that" means
+          Ask questions about your data in plain English
         </p>
       </div>
 

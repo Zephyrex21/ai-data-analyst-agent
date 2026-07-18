@@ -1,4 +1,4 @@
-import * as duckdb from "@duckdb/duckdb-wasm";
+import type { AsyncDuckDB } from "@duckdb/duckdb-wasm";
 import { DataType } from "apache-arrow";
 import type { Field } from "apache-arrow";
 
@@ -9,20 +9,25 @@ export interface QueryResult {
 
 export class SqlExecutionError extends Error {}
 
-let dbSingleton: duckdb.AsyncDuckDB | null = null;
-let dbInitPromise: Promise<duckdb.AsyncDuckDB> | null = null;
+let dbSingleton: AsyncDuckDB | null = null;
+let dbInitPromise: Promise<AsyncDuckDB> | null = null;
 
 /**
  * Lazily initializes a single shared AsyncDuckDB instance for the whole app.
- * Uses the jsDelivr-hosted bundles so we don't need any special Vite/worker
- * bundling config, and duckdb-wasm auto-selects a bundle that works without
- * cross-origin-isolation headers (falls back to the MVP bundle).
+ * Both @duckdb/duckdb-wasm and apache-arrow are dynamically imported here
+ * (not at module top-level) so their JS glue code isn't part of the initial
+ * page bundle — it's only fetched once someone actually uploads a CSV,
+ * keeping the cold-load bundle smaller for everyone who's just looking
+ * around. Uses the jsDelivr-hosted bundles so we don't need any special
+ * Vite/worker bundling config, and duckdb-wasm auto-selects a bundle that
+ * works without cross-origin-isolation headers (falls back to the MVP bundle).
  */
-async function getDb(): Promise<duckdb.AsyncDuckDB> {
+async function getDb(): Promise<AsyncDuckDB> {
   if (dbSingleton) return dbSingleton;
   if (dbInitPromise) return dbInitPromise;
 
   dbInitPromise = (async () => {
+    const duckdb = await import("@duckdb/duckdb-wasm");
     const bundles = duckdb.getJsDelivrBundles();
     const bundle = await duckdb.selectBundle(bundles);
 

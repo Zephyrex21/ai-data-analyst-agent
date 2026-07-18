@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import type { AskStage, ConversationTurn } from "../hooks/useAskQuestion";
 import type { Engine } from "../lib/llm";
 import { chooseChartType, isSingleScalar } from "../lib/chartSelection";
 import { BigNumberDisplay } from "./BigNumberDisplay";
-import { ResultChart } from "./ResultChart";
+
+// Recharts is a sizeable dependency only needed once a chart-worthy result
+// actually appears — most single-answer/table-only questions never need it,
+// so it shouldn't be part of the initial page bundle everyone downloads.
+const ResultChart = lazy(() =>
+  import("./ResultChart").then((m) => ({ default: m.ResultChart }))
+);
 
 interface AnswerCardProps {
   turn: ConversationTurn;
@@ -36,7 +42,7 @@ export function AnswerCard({ turn }: AnswerCardProps) {
   const showBigNumber = result ? isSingleScalar(result) : false;
 
   return (
-    <div className="glass rounded-2xl p-6 w-full">
+    <div className="turn-enter glass rounded-2xl p-6 w-full">
       <p className="text-sm text-[var(--color-text-muted)]">You asked</p>
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <p className="font-medium text-[var(--color-text)]">{question}</p>
@@ -49,7 +55,17 @@ export function AnswerCard({ turn }: AnswerCardProps) {
 
       {isBusy && (
         <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
-          <span className="h-2 w-2 rounded-full bg-[var(--color-accent)] animate-pulse" />
+          <span className="flex items-center gap-1">
+            <span className="thinking-dot h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
+            <span
+              className="thinking-dot h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]"
+              style={{ animationDelay: "0.15s" }}
+            />
+            <span
+              className="thinking-dot h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]"
+              style={{ animationDelay: "0.3s" }}
+            />
+          </span>
           {STAGE_LABELS[stage]}
         </div>
       )}
@@ -93,7 +109,13 @@ export function AnswerCard({ turn }: AnswerCardProps) {
 
       {result && !showBigNumber && chartSpec && (
         <div className="mb-4">
-          <ResultChart spec={chartSpec} result={result} />
+          <Suspense
+            fallback={
+              <div className="h-[320px] rounded-xl bg-[var(--color-surface-muted)] animate-pulse" />
+            }
+          >
+            <ResultChart spec={chartSpec} result={result} />
+          </Suspense>
         </div>
       )}
 

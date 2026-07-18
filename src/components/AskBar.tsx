@@ -15,7 +15,7 @@ export function AskBar({ onAsk, isBusy }: AskBarProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="glass rounded-2xl p-4 w-full flex gap-3">
+    <form onSubmit={handleSubmit} className="glass rounded-2xl p-4 w-full flex flex-col sm:flex-row gap-3">
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -26,7 +26,7 @@ export function AskBar({ onAsk, isBusy }: AskBarProps) {
       <button
         type="submit"
         disabled={isBusy || !value.trim()}
-        className="rounded-xl bg-[var(--color-accent)] text-white text-sm font-medium px-5 py-3 disabled:opacity-40"
+        className="rounded-xl bg-[var(--color-accent)] text-white text-sm font-medium px-5 py-3 whitespace-nowrap disabled:opacity-40"
       >
         {isBusy ? "Thinking…" : "Ask"}
       </button>

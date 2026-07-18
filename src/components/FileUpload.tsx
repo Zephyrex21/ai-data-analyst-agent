@@ -32,10 +32,10 @@ export function FileUpload({ onFileSelected, isLoading }: FileUploadProps) {
       onDragLeave={() => setIsDragActive(false)}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
-      className={`glass rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-colors ${
+      className={`glass rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-200 hover:shadow-md ${
         isDragActive
-          ? "border-[var(--color-accent)] bg-blue-50/60"
-          : "border-[var(--color-border)]"
+          ? "border-[var(--color-accent)] bg-blue-50/60 scale-[1.01]"
+          : "border-[var(--color-border)] hover:border-[var(--color-accent)]/40"
       }`}
     >
       <input
@@ -46,6 +46,24 @@ export function FileUpload({ onFileSelected, isLoading }: FileUploadProps) {
         onChange={handleInputChange}
         disabled={isLoading}
       />
+
+      <svg
+        width="40"
+        height="40"
+        viewBox="0 0 24 24"
+        fill="none"
+        className="mx-auto mb-3 text-[var(--color-accent)]"
+        aria-hidden="true"
+      >
+        <path
+          d="M12 15V3m0 0L7 8m5-5l5 5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+
       <p className="text-lg font-medium text-[var(--color-text)]">
         {isLoading ? "Reading file…" : "Drop a CSV file here"}
       </p>

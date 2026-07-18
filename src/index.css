@@ -28,3 +28,42 @@ body {
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
+
+/* Each new conversation turn eases in rather than just popping into place. */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.turn-enter {
+  animation: fade-in-up 0.35s ease-out;
+}
+
+/* Three-dot "thinking" indicator, used while a question is being processed. */
+@keyframes thinking-bounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.thinking-dot {
+  animation: thinking-bounce 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-enter,
+  .thinking-dot {
+    animation: none;
+  }
+}
