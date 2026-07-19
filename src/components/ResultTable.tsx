@@ -53,7 +53,7 @@ export function ResultTable({ result, questionForFilename }: ResultTableProps) {
       </table>
       <div className="flex items-center justify-between gap-3 px-4 py-2 flex-wrap">
         <p className="text-xs text-[var(--color-text-muted)]">
-          Showing {visibleRows.length.toLocaleString()} of {result.rows.length.toLocaleString()} row(s)
+          Showing {visibleRows.length.toLocaleString("en-US")} of {result.rows.length.toLocaleString("en-US")} row(s)
         </p>
         {hasMore && (
           <button

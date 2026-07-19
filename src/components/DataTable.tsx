@@ -23,7 +23,7 @@ export function DataTable({ data, onReset, previewRowCount = 50 }: DataTableProp
         <div>
           <h2 className="font-semibold text-[var(--color-text)]">{data.fileName}</h2>
           <p className="text-sm text-[var(--color-text-muted)]">
-            {data.totalRows.toLocaleString()} rows · {data.columns.length} columns
+            {data.totalRows.toLocaleString("en-US")} rows · {data.columns.length} columns
           </p>
         </div>
         <button
@@ -80,7 +80,7 @@ export function DataTable({ data, onReset, previewRowCount = 50 }: DataTableProp
       </div>
 
       <p className="mt-3 text-xs text-[var(--color-text-muted)]">
-        Showing {previewRows.length.toLocaleString()} of {data.totalRows.toLocaleString()} rows
+        Showing {previewRows.length.toLocaleString("en-US")} of {data.totalRows.toLocaleString("en-US")} rows
       </p>
     </div>
   );

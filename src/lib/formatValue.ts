@@ -16,14 +16,18 @@ export function formatDisplayValue(value: unknown): string {
   if (value === null || value === undefined) return "—";
   if (typeof value !== "number" || !Number.isFinite(value)) return String(value);
 
-  if (Number.isInteger(value)) return value.toLocaleString();
+  // Locale is hardcoded (not the browser default) so every visitor sees the
+  // same formatting regardless of their own OS/browser regional settings —
+  // otherwise the same number could display as "361,540.22" for one person
+  // and "3,61,540.22" for another (e.g. Indian digit grouping).
+  if (Number.isInteger(value)) return value.toLocaleString("en-US");
 
   const isLarge = Math.abs(value) >= 1;
   const decimals = isLarge ? 2 : 4;
   const factor = 10 ** decimals;
   const rounded = Math.round(value * factor) / factor;
 
-  return rounded.toLocaleString(undefined, {
+  return rounded.toLocaleString("en-US", {
     minimumFractionDigits: isLarge ? 2 : 0,
     maximumFractionDigits: decimals,
   });
