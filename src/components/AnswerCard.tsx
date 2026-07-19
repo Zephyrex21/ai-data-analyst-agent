@@ -2,6 +2,8 @@ import { lazy, Suspense } from "react";
 import type { AskStage, ConversationTurn } from "../hooks/useAskQuestion";
 import type { Engine } from "../lib/llm";
 import { chooseChartType, isSingleScalar } from "../lib/chartSelection";
+import { formatDisplayValue } from "../lib/formatValue";
+import { downloadResultAsCsv } from "../lib/downloadCsv";
 import { BigNumberDisplay } from "./BigNumberDisplay";
 
 // Recharts is a sizeable dependency only needed once a chart-worthy result
@@ -110,6 +112,14 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
 
         {result && (
           <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+            <div className="flex justify-end px-2 pt-2">
+              <button
+                onClick={() => downloadResultAsCsv(result, question)}
+                className="text-xs font-medium text-[var(--color-accent)] hover:underline"
+              >
+                Download as CSV
+              </button>
+            </div>
             <table className="min-w-full text-sm text-left">
               <thead className="bg-[var(--color-surface-muted)]">
                 <tr>
@@ -128,7 +138,7 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
                         {row[col] === null || row[col] === undefined ? (
                           <span className="text-[var(--color-text-muted)] italic">null</span>
                         ) : (
-                          String(row[col])
+                          formatDisplayValue(row[col])
                         )}
                       </td>
                     ))}

@@ -63,6 +63,16 @@ Rules when engine is "python" (pandas):
 - Only use pandas, numpy, and Python built-ins. Do not import os, sys, subprocess, socket, or any
   file/network module. Do not use open(), eval(), exec(), or __import__().
 - Keep the code short and focused only on answering the question.
+- Before computing an outlier, average, z-score, or similar statistic on a numeric column, check whether
+  the schema has a categorical column (like product, region, category, type) that the numeric column's
+  scale plausibly depends on. If a metric being compared "as one pool" would actually be dominated by
+  different underlying scales — e.g. one product being priced very differently from another, so a
+  cross-product revenue comparison flags normal-for-that-product values as outliers just because that
+  product costs more — compute the statistic WITHIN each group (e.g. groupby(...).apply(...) per group,
+  or a z-score computed per group) instead of pooling everything together, unless the question explicitly
+  asks for an overall/global figure ("what's the single highest revenue transaction across everything").
+  When genuinely unsure whether grouping is warranted, prefer grouping by the most relevant categorical
+  column over pooling — a scoped, correct answer beats a technically-computed but misleading one.
 
 Both engines — this rule applies either way:
 - If a question asks for a metric that isn't directly derivable from the given columns (e.g. "profit margin"

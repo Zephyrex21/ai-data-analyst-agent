@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import type { ChartSpec } from "../lib/chartSelection";
 import type { QueryResult } from "../lib/duckdb";
+import { formatDisplayValue, roundForDisplay } from "../lib/formatValue";
 
 // Using literal hex values rather than CSS custom properties here — SVG
 // presentation attributes (fill/stroke) don't reliably resolve var() across
@@ -27,11 +28,19 @@ interface ResultChartProps {
 }
 
 export function ResultChart({ spec, result }: ResultChartProps) {
-  const data = result.rows.map((row) => ({
-    [spec.labelKey]: row[spec.labelKey],
-    [spec.valueKey]:
-      typeof row[spec.valueKey] === "number" ? row[spec.valueKey] : Number(row[spec.valueKey]),
-  }));
+  const data = result.rows.map((row) => {
+    const raw = row[spec.valueKey];
+    const num = typeof raw === "number" ? raw : Number(raw);
+    return {
+      [spec.labelKey]: row[spec.labelKey],
+      // Rounded (not just formatted) so Recharts' own default pie label text
+      // — which we don't control the rendering of — shows a clean number
+      // instead of raw floating-point summation noise.
+      [spec.valueKey]: roundForDisplay(num),
+    };
+  });
+
+  const tooltipFormatter = (value: unknown) => formatDisplayValue(value);
 
   return (
     <div className="rounded-xl bg-white border border-[var(--color-border)] p-4" style={{ height: 320 }}>
@@ -40,21 +49,21 @@ export function ResultChart({ spec, result }: ResultChartProps) {
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />
             <XAxis dataKey={spec.labelKey} tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 12 }} />
-            <Tooltip />
+            <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => formatDisplayValue(v)} />
+            <Tooltip formatter={tooltipFormatter} />
             <Bar dataKey={spec.valueKey} fill={ACCENT} radius={[4, 4, 0, 0]} />
           </BarChart>
         ) : spec.type === "line" ? (
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />
             <XAxis dataKey={spec.labelKey} tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 12 }} />
-            <Tooltip />
+            <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => formatDisplayValue(v)} />
+            <Tooltip formatter={tooltipFormatter} />
             <Line type="monotone" dataKey={spec.valueKey} stroke={ACCENT} strokeWidth={2} dot={{ r: 3 }} />
           </LineChart>
         ) : (
           <PieChart>
-            <Tooltip />
+            <Tooltip formatter={tooltipFormatter} />
             <Pie data={data} dataKey={spec.valueKey} nameKey={spec.labelKey} outerRadius={100} label>
               {data.map((_, i) => (
                 <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
