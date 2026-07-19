@@ -7,6 +7,7 @@ import { DataTable } from "./components/DataTable";
 import { AskBar } from "./components/AskBar";
 import { AnswerCard } from "./components/AnswerCard";
 import { SampleQuestions } from "./components/SampleQuestions";
+import { ThemeToggle } from "./components/ThemeToggle";
 
 function App() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -43,6 +44,10 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-8 sm:py-12 gap-6">
+      <div className="fixed top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
+
       <div className="text-center">
         <h1 className="text-2xl font-semibold text-[var(--color-text)]">
           AI Data Analyst Agent
@@ -62,7 +67,7 @@ function App() {
         )}
 
         {csv.error && (
-          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {csv.error}
           </div>
         )}
@@ -70,7 +75,7 @@ function App() {
         {csv.data && <DataTable data={csv.data} onReset={handleReset} />}
 
         {duckDb.tableError && (
-          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             DuckDB error: {duckDb.tableError}
           </div>
         )}

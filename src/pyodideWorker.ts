@@ -59,12 +59,22 @@ import json as _json
 
 def _serialize(_value):
     if isinstance(_value, pd.DataFrame):
-        _df = _value
+        _df = _value.copy()
     elif isinstance(_value, pd.Series):
         _df = _value.reset_index()
     else:
         return _json.dumps({"columns": ["result"], "records": [{"result": _value}]})
-    records = _json.loads(_df.to_json(orient="records", date_format="iso"))
+
+    # Format datetime columns as clean date-only strings (matching the SQL
+    # path's formatting) instead of pandas' default full ISO datetime
+    # ("2025-10-05T00:00:00.000") — there's no actual time-of-day in this
+    # data, and the redundant timestamp was wide enough to make Excel show
+    # "####" for the column instead of a readable date on export.
+    for _col in _df.columns:
+        if pd.api.types.is_datetime64_any_dtype(_df[_col]):
+            _df[_col] = _df[_col].dt.strftime("%Y-%m-%d")
+
+    records = _json.loads(_df.to_json(orient="records"))
     return _json.dumps({"columns": _df.columns.tolist(), "records": records})
 
 _serialize(result)

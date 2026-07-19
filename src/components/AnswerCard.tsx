@@ -2,9 +2,8 @@ import { lazy, Suspense } from "react";
 import type { AskStage, ConversationTurn } from "../hooks/useAskQuestion";
 import type { Engine } from "../lib/llm";
 import { chooseChartType, isSingleScalar } from "../lib/chartSelection";
-import { formatDisplayValue } from "../lib/formatValue";
-import { downloadResultAsCsv } from "../lib/downloadCsv";
 import { BigNumberDisplay } from "./BigNumberDisplay";
+import { ResultTable } from "./ResultTable";
 
 // Recharts is a sizeable dependency only needed once a chart-worthy result
 // actually appears — most single-answer/table-only questions never need it,
@@ -28,8 +27,8 @@ const STAGE_LABELS: Record<AskStage, string> = {
 };
 
 const ENGINE_BADGE_STYLES: Record<Engine, string> = {
-  sql: "bg-blue-100 text-blue-700",
-  python: "bg-amber-100 text-amber-700",
+  sql: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+  python: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
 };
 
 export function AnswerCard({ turn, number }: AnswerCardProps) {
@@ -63,7 +62,7 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
             </span>
           )}
           {stage === "done" && attemptsUsed > 1 && (
-            <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+            <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300">
               Self-corrected after {attemptsUsed} attempts
             </span>
           )}
@@ -87,7 +86,7 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
         )}
 
         {error && (
-          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
           </div>
         )}
@@ -110,47 +109,7 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
           </div>
         )}
 
-        {result && (
-          <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
-            <div className="flex justify-end px-2 pt-2">
-              <button
-                onClick={() => downloadResultAsCsv(result, question)}
-                className="text-xs font-medium text-[var(--color-accent)] hover:underline"
-              >
-                Download as CSV
-              </button>
-            </div>
-            <table className="min-w-full text-sm text-left">
-              <thead className="bg-[var(--color-surface-muted)]">
-                <tr>
-                  {result.columns.map((col) => (
-                    <th key={col} className="px-4 py-2 whitespace-nowrap font-medium">
-                      {col}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {result.rows.map((row, i) => (
-                  <tr key={i} className="border-t border-[var(--color-border)]">
-                    {result.columns.map((col) => (
-                      <td key={col} className="px-4 py-2 whitespace-nowrap">
-                        {row[col] === null || row[col] === undefined ? (
-                          <span className="text-[var(--color-text-muted)] italic">null</span>
-                        ) : (
-                          formatDisplayValue(row[col])
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="px-4 py-2 text-xs text-[var(--color-text-muted)]">
-              {result.rows.length} row(s) returned
-            </p>
-          </div>
-        )}
+        {result && <ResultTable result={result} questionForFilename={question} />}
       </div>
     </div>
   );

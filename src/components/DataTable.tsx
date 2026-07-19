@@ -7,11 +7,11 @@ interface DataTableProps {
 }
 
 const TYPE_BADGE_STYLES: Record<ColumnType, string> = {
-  number: "bg-blue-100 text-blue-700",
-  string: "bg-gray-100 text-gray-600",
-  boolean: "bg-purple-100 text-purple-700",
-  date: "bg-green-100 text-green-700",
-  empty: "bg-red-100 text-red-600",
+  number: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+  string: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
+  boolean: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+  date: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+  empty: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-300",
 };
 
 export function DataTable({ data, onReset, previewRowCount = 50 }: DataTableProps) {
@@ -35,7 +35,7 @@ export function DataTable({ data, onReset, previewRowCount = 50 }: DataTableProp
       </div>
 
       {data.warnings.length > 0 && (
-        <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+        <div className="mb-4 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
           {data.warnings.map((w, i) => (
             <p key={i}>{w}</p>
           ))}
@@ -64,7 +64,7 @@ export function DataTable({ data, onReset, previewRowCount = 50 }: DataTableProp
             {previewRows.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="border-t border-[var(--color-border)] odd:bg-white even:bg-[var(--color-surface-muted)]/40"
+                className="border-t border-[var(--color-border)] odd:bg-[var(--color-surface)] even:bg-[var(--color-surface-muted)]/40"
               >
                 {data.columns.map((col) => (
                   <td key={col.name} className="px-4 py-2 whitespace-nowrap text-[var(--color-text)]">

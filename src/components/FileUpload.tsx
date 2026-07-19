@@ -46,6 +46,10 @@ export function FileUpload({ onFileSelected, onSampleSelected, isLoading }: File
   return (
     <div className="flex flex-col gap-3">
       <div
+        role="button"
+        tabIndex={busy ? -1 : 0}
+        aria-label="Upload a CSV file — drop a file here, or press Enter to browse"
+        aria-disabled={busy}
         onDragOver={(e) => {
           e.preventDefault();
           setIsDragActive(true);
@@ -53,6 +57,13 @@ export function FileUpload({ onFileSelected, onSampleSelected, isLoading }: File
         onDragLeave={() => setIsDragActive(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (busy) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
         className={`glass rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-200 hover:shadow-md ${
           isDragActive
             ? "border-[var(--color-accent)] bg-blue-50/60 scale-[1.01]"

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   --color-accent: #007aff; /* system blue */
   --color-surface: #ffffff;
@@ -7,6 +9,15 @@
   --color-border: #e5e5ea;
   --color-text: #1d1d1f;
   --color-text-muted: #6e6e73;
+}
+
+[data-theme="dark"] {
+  --color-accent: #0a84ff;
+  --color-surface: #1c1c1e;
+  --color-surface-muted: #000000;
+  --color-border: #38383a;
+  --color-text: #f5f5f7;
+  --color-text-muted: #98989d;
 }
 
 html, body, #root {
@@ -19,6 +30,7 @@ body {
   color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* frosted glass utility, used for panels/cards */
@@ -27,6 +39,24 @@ body {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"] .glass {
+  background: rgba(28, 28, 30, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Consistent keyboard-focus ring across every interactive element — only
+   shown for keyboard/programmatic focus (:focus-visible), not mouse clicks. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-accent);
 }
 
 /* Each new conversation turn eases in rather than just popping into place. */

@@ -16,7 +16,7 @@ export function SampleQuestions({ onAsk, isBusy }: SampleQuestionsProps) {
           key={q}
           onClick={() => onAsk(q)}
           disabled={isBusy}
-          className="text-xs rounded-full border border-[var(--color-border)] bg-white px-3 py-1.5 text-[var(--color-text)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors disabled:opacity-50 disabled:cursor-default"
+          className="text-xs rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-[var(--color-text)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-default disabled:active:scale-100"
         >
           {q}
         </button>
