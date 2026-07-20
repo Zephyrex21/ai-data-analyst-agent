@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useCsvData } from "./hooks/useCsvData";
 import { useDuckDb } from "./hooks/useDuckDb";
 import { useAskQuestion } from "./hooks/useAskQuestion";
@@ -8,6 +8,7 @@ import { AskBar } from "./components/AskBar";
 import { AnswerCard } from "./components/AnswerCard";
 import { SampleQuestions } from "./components/SampleQuestions";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { Landing } from "./components/Landing";
 
 function App() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -15,6 +16,11 @@ function App() {
   const csv = useCsvData();
   const duckDb = useDuckDb();
   const ask = useAskQuestion(csv.data, uploadedFile);
+  const toolRef = useRef<HTMLDivElement>(null);
+
+  function scrollToTool() {
+    toolRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   function loadFile(file: File, isSample: boolean) {
     setUploadedFile(file);
@@ -48,16 +54,18 @@ function App() {
         <ThemeToggle />
       </div>
 
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold text-[var(--color-text)]">
-          AI Data Analyst Agent
-        </h1>
-        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Ask questions about your data in plain English
-        </p>
-      </div>
+      <Landing onTryDemo={scrollToTool} />
 
-      <div className="w-full max-w-4xl flex flex-col gap-6">
+      <div ref={toolRef} className="w-full max-w-4xl flex flex-col gap-6 scroll-mt-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold text-[var(--color-text)]">
+            AI Data Analyst Agent
+          </h1>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+            Ask questions about your data in plain English
+          </p>
+        </div>
+
         {!csv.data && (
           <FileUpload
             onFileSelected={handleFileSelected}
