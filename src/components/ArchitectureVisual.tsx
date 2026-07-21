@@ -15,7 +15,7 @@ const STEPS: FlowStep[] = [
 
 export function ArchitectureVisual() {
   return (
-    <div className="glass rounded-2xl p-6 w-full">
+    <div className="clay p-6 w-full">
       <p className="text-sm font-medium text-[var(--color-text-muted)] mb-4 text-center">
         Everything except the LLM call runs entirely in your browser
       </p>
@@ -23,11 +23,8 @@ export function ArchitectureVisual() {
         {STEPS.map((step, i) => (
           <div key={step.label} className="flex flex-col md:flex-row items-center gap-2 md:gap-1 flex-1">
             <div
-              className={`w-full rounded-xl border px-4 py-3 text-center ${
-                step.variant === "accent"
-                  ? "border-[var(--color-accent)]/40 bg-blue-50 dark:bg-blue-950"
-                  : "border-[var(--color-border)] bg-[var(--color-surface)]"
-              }`}
+              className="clay-inset w-full px-4 py-3 text-center"
+              style={step.variant === "accent" ? { background: "var(--color-accent-soft)" } : undefined}
             >
               <p className="text-sm font-semibold text-[var(--color-text)]">{step.label}</p>
               <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{step.detail}</p>

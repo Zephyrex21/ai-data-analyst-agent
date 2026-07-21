@@ -15,7 +15,8 @@ export function TechStackBadges() {
       {TECH_STACK.map((tech) => (
         <span
           key={tech}
-          className="text-xs font-medium rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-[var(--color-text-muted)]"
+          className="clay text-xs font-medium px-3.5 py-1.5 text-[var(--color-text-muted)]"
+          style={{ borderRadius: 9999, boxShadow: "4px 4px 10px var(--clay-shadow-dark), -3px -3px 8px var(--clay-shadow-light)" }}
         >
           {tech}
         </span>

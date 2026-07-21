@@ -64,11 +64,10 @@ export function FileUpload({ onFileSelected, onSampleSelected, isLoading }: File
             inputRef.current?.click();
           }
         }}
-        className={`glass rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-200 hover:shadow-md ${
-          isDragActive
-            ? "border-[var(--color-accent)] bg-blue-50/60 scale-[1.01]"
-            : "border-[var(--color-border)] hover:border-[var(--color-accent)]/40"
+        className={`clay clay-pressable p-12 text-center transition-transform duration-200 ${
+          isDragActive ? "scale-[1.02]" : ""
         }`}
+        style={isDragActive ? { background: "var(--color-accent-soft)" } : undefined}
       >
         <input
           ref={inputRef}
@@ -79,22 +78,27 @@ export function FileUpload({ onFileSelected, onSampleSelected, isLoading }: File
           disabled={busy}
         />
 
-        <svg
-          width="40"
-          height="40"
-          viewBox="0 0 24 24"
-          fill="none"
-          className="mx-auto mb-3 text-[var(--color-accent)]"
-          aria-hidden="true"
+        <div
+          className="clay mx-auto mb-4 flex items-center justify-center"
+          style={{ width: 64, height: 64, borderRadius: 9999 }}
         >
-          <path
-            d="M12 15V3m0 0L7 8m5-5l5 5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            className="text-[var(--color-accent)]"
+            aria-hidden="true"
+          >
+            <path
+              d="M12 15V3m0 0L7 8m5-5l5 5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
 
         <p className="text-lg font-medium text-[var(--color-text)]">
           {isLoading ? "Reading file…" : "Drop a CSV file here"}
@@ -113,7 +117,7 @@ export function FileUpload({ onFileSelected, onSampleSelected, isLoading }: File
           {isSampleLoading ? "Loading sample data…" : "Or try it instantly with sample sales data →"}
         </button>
         {sampleError && (
-          <p className="mt-1 text-xs text-red-600">{sampleError}</p>
+          <p className="mt-1 text-xs text-red-600 dark:text-red-400">{sampleError}</p>
         )}
       </div>
     </div>

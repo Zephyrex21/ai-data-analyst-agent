@@ -45,24 +45,27 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
   return (
     <div className="turn-enter flex gap-3 w-full">
       <div className="flex-shrink-0 flex items-start justify-center pt-6">
-        <span className="flex items-center justify-center h-7 w-7 rounded-full bg-[var(--color-surface-muted)] border border-[var(--color-border)] text-xs font-semibold text-[var(--color-text-muted)]">
+        <span
+          className="clay flex items-center justify-center h-8 w-8 text-xs font-semibold text-[var(--color-accent)]"
+          style={{ borderRadius: 9999 }}
+        >
           {number}
         </span>
       </div>
 
-      <div className="glass rounded-2xl p-6 flex-1 min-w-0">
+      <div className="clay p-6 flex-1 min-w-0">
         <p className="text-sm text-[var(--color-text-muted)]">You asked</p>
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <p className="font-medium text-[var(--color-text)]">{question}</p>
           {engine && (
             <span
-              className={`text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded ${ENGINE_BADGE_STYLES[engine]}`}
+              className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${ENGINE_BADGE_STYLES[engine]}`}
             >
               {engine === "sql" ? "SQL" : "Python"}
             </span>
           )}
           {stage === "done" && attemptsUsed > 1 && (
-            <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300">
+            <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300">
               Self-corrected after {attemptsUsed} attempts
             </span>
           )}
@@ -86,7 +89,7 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
         )}
 
         {error && (
-          <div className="rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          <div className="rounded-2xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
           </div>
         )}
@@ -101,7 +104,7 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
           <div className="mb-4">
             <Suspense
               fallback={
-                <div className="h-[320px] rounded-xl bg-[var(--color-surface-muted)] animate-pulse" />
+                <div className="h-[320px] rounded-[28px] bg-[var(--color-surface-muted)] animate-pulse" />
               }
             >
               <ResultChart spec={chartSpec} result={result} />

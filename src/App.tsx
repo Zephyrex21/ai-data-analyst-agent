@@ -75,7 +75,7 @@ function App() {
         )}
 
         {csv.error && (
-          <div className="rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          <div className="rounded-2xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {csv.error}
           </div>
         )}
@@ -83,7 +83,7 @@ function App() {
         {csv.data && <DataTable data={csv.data} onReset={handleReset} />}
 
         {duckDb.tableError && (
-          <div className="rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          <div className="rounded-2xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             DuckDB error: {duckDb.tableError}
           </div>
         )}

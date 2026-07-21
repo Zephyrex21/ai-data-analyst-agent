@@ -9,7 +9,8 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="flex items-center justify-center h-9 w-9 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:text-[var(--color-accent)] hover:border-[var(--color-accent)]/40 transition-colors"
+      className="clay clay-pressable flex items-center justify-center h-10 w-10 text-[var(--color-text-muted)] hover:text-[var(--color-accent)]"
+      style={{ borderRadius: 9999 }}
     >
       {isDark ? (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">

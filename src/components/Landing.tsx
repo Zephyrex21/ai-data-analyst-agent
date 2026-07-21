@@ -26,7 +26,7 @@ export function Landing({ onTryDemo }: LandingProps) {
         <div className="flex flex-wrap items-center justify-center gap-3 mt-2">
           <button
             onClick={onTryDemo}
-            className="rounded-xl bg-[var(--color-accent)] text-white text-sm font-medium px-6 py-3 transition-transform active:scale-[0.98]"
+            className="clay clay-pressable bg-[var(--color-accent)] text-white text-sm font-medium px-6 py-3"
           >
             Try the live demo ↓
           </button>
@@ -34,7 +34,7 @@ export function Landing({ onTryDemo }: LandingProps) {
             href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] text-sm font-medium px-6 py-3 hover:border-[var(--color-accent)]/40 transition-colors"
+            className="clay clay-pressable text-[var(--color-text)] text-sm font-medium px-6 py-3"
           >
             View on GitHub
           </a>
@@ -45,7 +45,7 @@ export function Landing({ onTryDemo }: LandingProps) {
       <ArchitectureVisual />
       <TechStackBadges />
 
-      <div className="w-full border-t border-[var(--color-border)]" />
+      <div className="w-full h-px" style={{ background: "var(--color-border)" }} />
     </div>
   );
 }

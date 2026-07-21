@@ -3,21 +3,31 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  --color-accent: #007aff; /* system blue */
-  --color-surface: #ffffff;
-  --color-surface-muted: #f5f5f7;
-  --color-border: #e5e5ea;
-  --color-text: #1d1d1f;
-  --color-text-muted: #6e6e73;
+  /* Restrained/premium claymorphism — periwinkle-indigo, not system blue */
+  --color-accent: #5b5fc7;
+  --color-accent-soft: #eceafc;
+  --color-surface: #f8f7fb;
+  --color-surface-muted: #ececf7;
+  --color-border: #ddd9ee;
+  --color-text: #2e2b45;
+  --color-text-muted: #6b6785;
+
+  /* Clay shadow pair — tinted toward the accent hue, never flat black/gray */
+  --clay-shadow-dark: rgba(91, 95, 199, 0.22);
+  --clay-shadow-light: rgba(255, 255, 255, 0.85);
 }
 
 [data-theme="dark"] {
-  --color-accent: #0a84ff;
-  --color-surface: #1c1c1e;
-  --color-surface-muted: #000000;
-  --color-border: #38383a;
-  --color-text: #f5f5f7;
-  --color-text-muted: #98989d;
+  --color-accent: #9296f0;
+  --color-accent-soft: #322f52;
+  --color-surface: #2a2740;
+  --color-surface-muted: #1c1a2e;
+  --color-border: #3d3958;
+  --color-text: #ede9f7;
+  --color-text-muted: #a29cc2;
+
+  --clay-shadow-dark: rgba(0, 0, 0, 0.45);
+  --clay-shadow-light: rgba(255, 255, 255, 0.05);
 }
 
 html, body, #root {
@@ -33,21 +43,58 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* frosted glass utility, used for panels/cards */
-.glass {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+/* Claymorphism surface: saturated card color, no hard border, depth faked
+   via a paired shadow (soft dark shadow down-right + bright highlight
+   up-left). Shadow colors are tinted toward the accent hue, never flat
+   black/gray — that tint is what keeps clay from looking like a plain
+   drop-shadow card. */
+.clay {
+  background: var(--color-surface);
+  border-radius: 28px;
+  box-shadow:
+    8px 8px 18px var(--clay-shadow-dark),
+    -6px -6px 14px var(--clay-shadow-light);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
 }
 
-[data-theme="dark"] .glass {
-  background: rgba(28, 28, 30, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.clay-accent {
+  background: var(--color-accent-soft);
+}
+
+/* Recessed variant, for form inputs — clay differentiates "things you press
+   into" from "things that sit on top" by inverting the shadow direction. */
+.clay-inset {
+  background: var(--color-surface-muted);
+  border-radius: 20px;
+  border: none;
+  box-shadow:
+    inset 4px 4px 10px var(--clay-shadow-dark),
+    inset -3px -3px 8px var(--clay-shadow-light);
+}
+
+/* Applied to anything clickable built on .clay — press compresses the
+   shadow depth together with a scale-down, so it reads as "pushed in"
+   rather than just shrinking. */
+.clay-pressable {
+  cursor: pointer;
+}
+
+.clay-pressable:hover {
+  box-shadow:
+    10px 10px 22px var(--clay-shadow-dark),
+    -7px -7px 16px var(--clay-shadow-light);
+}
+
+.clay-pressable:active {
+  box-shadow:
+    3px 3px 8px var(--clay-shadow-dark),
+    -2px -2px 6px var(--clay-shadow-light);
+  transform: scale(0.98) translateY(1px);
 }
 
 /* Consistent keyboard-focus ring across every interactive element — only
-   shown for keyboard/programmatic focus (:focus-visible), not mouse clicks. */
+   shown for keyboard/programmatic focus (:focus-visible), not mouse clicks.
+   Kept deliberately prominent so clay's shadow effect never swallows it. */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -55,24 +102,26 @@ textarea:focus-visible,
 [role="button"]:focus-visible {
   outline: none;
   box-shadow:
-    0 0 0 2px var(--color-surface),
-    0 0 0 4px var(--color-accent);
+    0 0 0 3px var(--color-surface),
+    0 0 0 6px var(--color-accent);
 }
 
-/* Each new conversation turn eases in rather than just popping into place. */
+/* Each new conversation turn eases in with a slight overshoot — clay is a
+   tactile, physical-feeling style, so a flat linear ease-out reads wrong;
+   a small bounce sells the "soft, springy" material better. */
 @keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(14px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 .turn-enter {
-  animation: fade-in-up 0.35s ease-out;
+  animation: fade-in-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Three-dot "thinking" indicator, used while a question is being processed. */
@@ -95,5 +144,8 @@ textarea:focus-visible,
   .turn-enter,
   .thinking-dot {
     animation: none;
+  }
+  .clay-pressable:active {
+    transform: none;
   }
 }

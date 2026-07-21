@@ -16,7 +16,7 @@ export function ResultTable({ result, questionForFilename }: ResultTableProps) {
   const hasMore = visibleCount < result.rows.length;
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+    <div className="clay-inset overflow-x-auto p-1">
       <div className="flex justify-end px-2 pt-2">
         <button
           onClick={() => downloadResultAsCsv(result, questionForFilename)}

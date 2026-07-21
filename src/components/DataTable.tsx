@@ -18,7 +18,7 @@ export function DataTable({ data, onReset, previewRowCount = 50 }: DataTableProp
   const previewRows = data.rows.slice(0, previewRowCount);
 
   return (
-    <div className="glass rounded-2xl p-6 w-full">
+    <div className="clay p-6 w-full">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div>
           <h2 className="font-semibold text-[var(--color-text)]">{data.fileName}</h2>
@@ -35,14 +35,14 @@ export function DataTable({ data, onReset, previewRowCount = 50 }: DataTableProp
       </div>
 
       {data.warnings.length > 0 && (
-        <div className="mb-4 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+        <div className="mb-4 rounded-2xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
           {data.warnings.map((w, i) => (
             <p key={i}>{w}</p>
           ))}
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+      <div className="clay-inset overflow-x-auto p-1">
         <table className="min-w-full text-sm text-left">
           <thead className="bg-[var(--color-surface-muted)] sticky top-0">
             <tr>
@@ -51,7 +51,7 @@ export function DataTable({ data, onReset, previewRowCount = 50 }: DataTableProp
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-[var(--color-text)]">{col.name}</span>
                     <span
-                      className={`text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded ${TYPE_BADGE_STYLES[col.type]}`}
+                      className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${TYPE_BADGE_STYLES[col.type]}`}
                     >
                       {col.type}
                     </span>
