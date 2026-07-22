@@ -26,7 +26,7 @@ export function Landing({ onTryDemo }: LandingProps) {
         <div className="flex flex-wrap items-center justify-center gap-3 mt-2">
           <button
             onClick={onTryDemo}
-            className="clay clay-pressable bg-[var(--color-accent)] text-white text-sm font-medium px-6 py-3"
+            className="clay clay-pressable clay-solid-accent text-white text-sm font-medium px-6 py-3"
           >
             Try the live demo ↓
           </button>

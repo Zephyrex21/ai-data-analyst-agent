@@ -26,7 +26,7 @@ export function AskBar({ onAsk, isBusy }: AskBarProps) {
       <button
         type="submit"
         disabled={isBusy || !value.trim()}
-        className="clay clay-pressable bg-[var(--color-accent)] text-white text-sm font-medium px-5 py-3 whitespace-nowrap disabled:opacity-40 disabled:pointer-events-none"
+        className="clay clay-pressable clay-solid-accent text-white text-sm font-medium px-5 py-3 whitespace-nowrap disabled:opacity-40 disabled:pointer-events-none"
       >
         {isBusy ? "Thinking…" : "Ask"}
       </button>

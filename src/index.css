@@ -61,6 +61,15 @@ body {
   background: var(--color-accent-soft);
 }
 
+/* Solid accent-colored clay surface, for primary CTA buttons. A Tailwind
+   bg-[var(--color-accent)] utility here would be silently overridden by
+   .clay's own background (unlayered custom CSS always beats Tailwind's
+   @layer utilities regardless of source order) — same class of bug as the
+   rounded-[20px] issue caught earlier. Solved the same way: a real class. */
+.clay-solid-accent {
+  background: var(--color-accent);
+}
+
 /* Recessed variant, for form inputs — clay differentiates "things you press
    into" from "things that sit on top" by inverting the shadow direction. */
 .clay-inset {
