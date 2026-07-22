@@ -1,8 +1,7 @@
 import { FeatureHighlights } from "./FeatureHighlights";
 import { ArchitectureVisual } from "./ArchitectureVisual";
 import { TechStackBadges } from "./TechStackBadges";
-
-const GITHUB_URL = "https://github.com/Zephyrex21/ai-data-analyst-agent";
+import { TerminalDemo } from "./TerminalDemo";
 
 interface LandingProps {
   onTryDemo: () => void;
@@ -10,7 +9,7 @@ interface LandingProps {
 
 export function Landing({ onTryDemo }: LandingProps) {
   return (
-    <div className="w-full max-w-4xl flex flex-col items-center gap-10 py-8">
+    <div className="w-full max-w-4xl flex flex-col items-center gap-16 py-8">
       <div className="text-center flex flex-col items-center gap-4">
         <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-accent)]">
           Zero-cost · Client-side · Self-correcting
@@ -30,20 +29,25 @@ export function Landing({ onTryDemo }: LandingProps) {
           >
             Try the live demo ↓
           </button>
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="clay clay-pressable text-[var(--color-text)] text-sm font-medium px-6 py-3"
-          >
-            View on GitHub
-          </a>
         </div>
       </div>
 
-      <FeatureHighlights />
-      <ArchitectureVisual />
-      <TechStackBadges />
+      <TerminalDemo />
+
+      <div id="features" className="w-full flex flex-col items-center gap-6 scroll-mt-24">
+        <h3 className="text-xl font-semibold text-[var(--color-text)]">Why this is different</h3>
+        <FeatureHighlights />
+      </div>
+
+      <div id="architecture" className="w-full flex flex-col items-center gap-6 scroll-mt-24">
+        <h3 className="text-xl font-semibold text-[var(--color-text)]">How it works</h3>
+        <ArchitectureVisual />
+      </div>
+
+      <div className="w-full flex flex-col items-center gap-6">
+        <h3 className="text-xl font-semibold text-[var(--color-text)]">Built with</h3>
+        <TechStackBadges />
+      </div>
 
       <div className="w-full h-px" style={{ background: "var(--color-border)" }} />
     </div>

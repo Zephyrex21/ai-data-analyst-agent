@@ -7,8 +7,9 @@ import { DataTable } from "./components/DataTable";
 import { AskBar } from "./components/AskBar";
 import { AnswerCard } from "./components/AnswerCard";
 import { SampleQuestions } from "./components/SampleQuestions";
-import { ThemeToggle } from "./components/ThemeToggle";
 import { Landing } from "./components/Landing";
+import { Navbar } from "./components/Navbar";
+import { Footer } from "./components/Footer";
 
 function App() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -16,10 +17,27 @@ function App() {
   const csv = useCsvData();
   const duckDb = useDuckDb();
   const ask = useAskQuestion(csv.data, uploadedFile);
+  const topRef = useRef<HTMLDivElement>(null);
   const toolRef = useRef<HTMLDivElement>(null);
 
   function scrollToTool() {
     toolRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function scrollToTop() {
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function handleNavigate(id: string) {
+    if (id === "top") {
+      scrollToTop();
+      return;
+    }
+    if (id === "tool") {
+      scrollToTool();
+      return;
+    }
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function loadFile(file: File, isSample: boolean) {
@@ -49,14 +67,13 @@ function App() {
   const isBusy = ask.isBusy || duckDb.isLoadingTable || !duckDb.isTableReady;
 
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 py-8 sm:py-12 gap-6">
-      <div className="fixed top-4 right-4 z-10">
-        <ThemeToggle />
-      </div>
+    <div className="min-h-screen flex flex-col items-center px-4 py-4 gap-6">
+      <div ref={topRef} />
+      <Navbar onNavigate={handleNavigate} />
 
       <Landing onTryDemo={scrollToTool} />
 
-      <div ref={toolRef} className="w-full max-w-4xl flex flex-col gap-6 scroll-mt-6">
+      <div ref={toolRef} id="tool" className="w-full max-w-4xl flex flex-col gap-6 scroll-mt-24">
         <div className="text-center">
           <h1 className="text-2xl font-semibold text-[var(--color-text)]">
             AI Data Analyst Agent
@@ -107,6 +124,8 @@ function App() {
             <AnswerCard key={turn.id} turn={turn} number={number} />
           ))}
       </div>
+
+      <Footer onBackToTop={scrollToTop} />
     </div>
   );
 }
