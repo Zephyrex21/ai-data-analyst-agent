@@ -104,29 +104,24 @@ export function TerminalDemo() {
         </span>
       </div>
 
-      {/* Recessed "screen" — deliberately kept dark regardless of theme, matching a real terminal/editor rather than adapting to light mode */}
-      <div
-        className="rounded-[20px] p-5 font-mono text-sm min-h-[220px]"
-        style={{
-          background: "#1c1a2e",
-          boxShadow: "inset 3px 3px 8px rgba(0,0,0,0.4), inset -2px -2px 6px rgba(255,255,255,0.03)",
-        }}
-      >
-        <div className="text-[#8ec6a8]">
-          <span className="text-[#9296f0]">You asked&gt; </span>
+      {/* Recessed "screen" — now fully theme-reactive via CSS variables,
+          same clay-inset treatment used for real inputs/tables elsewhere. */}
+      <div className="clay-inset p-5 font-mono text-sm min-h-[220px]">
+        <div style={{ color: "var(--color-text)" }}>
+          <span style={{ color: "var(--color-accent)" }}>You asked&gt; </span>
           {questionText}
           {phase === "typing-question" && <span className="animate-pulse">▌</span>}
         </div>
 
         {phase === "thinking" && (
-          <div className="mt-3 flex items-center gap-1 text-[#a29cc2]">
-            <span className="thinking-dot h-1.5 w-1.5 rounded-full bg-[#9296f0]" />
+          <div className="mt-3 flex items-center gap-1">
+            <span className="thinking-dot h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />
             <span
-              className="thinking-dot h-1.5 w-1.5 rounded-full bg-[#9296f0]"
+              className="thinking-dot h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]"
               style={{ animationDelay: "0.15s" }}
             />
             <span
-              className="thinking-dot h-1.5 w-1.5 rounded-full bg-[#9296f0]"
+              className="thinking-dot h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]"
               style={{ animationDelay: "0.3s" }}
             />
           </div>
@@ -134,10 +129,16 @@ export function TerminalDemo() {
 
         {(phase === "typing-code" || phase === "showing-result" || phase === "pausing") && (
           <div className="mt-3">
-            <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-[#322f52] text-[#9296f0]">
+            <span
+              className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded"
+              style={{ background: "var(--color-accent-soft)", color: "var(--color-accent)" }}
+            >
               {step.engine}
             </span>
-            <pre className="mt-2 whitespace-pre-wrap text-[#ede9f7] text-xs leading-relaxed">
+            <pre
+              className="mt-2 whitespace-pre-wrap text-xs leading-relaxed"
+              style={{ color: "var(--color-text)" }}
+            >
               {codeText}
               {phase === "typing-code" && <span className="animate-pulse">▌</span>}
             </pre>
@@ -145,7 +146,9 @@ export function TerminalDemo() {
         )}
 
         {(phase === "showing-result" || phase === "pausing") && (
-          <div className="mt-3 text-[#8ec6a8] text-xs">→ {step.result}</div>
+          <div className="mt-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
+            → {step.result}
+          </div>
         )}
       </div>
     </div>

@@ -4,15 +4,18 @@ const GITHUB_URL = "https://github.com/Zephyrex21/ai-data-analyst-agent";
 
 interface NavbarProps {
   onNavigate: (id: string) => void;
+  variant: "home" | "tool";
 }
 
-const NAV_LINKS = [
+const HOME_NAV_LINKS = [
   { label: "Features", id: "features" },
   { label: "Architecture", id: "architecture" },
   { label: "Try Demo", id: "tool" },
 ];
 
-export function Navbar({ onNavigate }: NavbarProps) {
+export function Navbar({ onNavigate, variant }: NavbarProps) {
+  const navLinks = variant === "home" ? HOME_NAV_LINKS : [{ label: "← Home", id: "top" }];
+
   return (
     <div className="sticky top-4 z-20 w-full max-w-4xl px-2">
       <nav className="clay flex items-center justify-between gap-3 px-5 py-2.5">
@@ -24,7 +27,7 @@ export function Navbar({ onNavigate }: NavbarProps) {
         </button>
 
         <div className="hidden sm:flex items-center gap-5">
-          {NAV_LINKS.map((link) => (
+          {navLinks.map((link) => (
             <button
               key={link.id}
               onClick={() => onNavigate(link.id)}
