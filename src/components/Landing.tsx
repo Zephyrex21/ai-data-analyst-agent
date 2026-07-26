@@ -2,6 +2,7 @@ import { FeatureHighlights } from "./FeatureHighlights";
 import { ArchitectureVisual } from "./ArchitectureVisual";
 import { TechStackBadges } from "./TechStackBadges";
 import { TerminalDemo } from "./TerminalDemo";
+import { Reveal } from "./Reveal";
 
 interface LandingProps {
   onTryDemo: () => void;
@@ -32,7 +33,9 @@ export function Landing({ onTryDemo }: LandingProps) {
         </div>
       </div>
 
-      <TerminalDemo />
+      <Reveal className="w-full flex justify-center">
+        <TerminalDemo />
+      </Reveal>
 
       <div id="features" className="w-full flex flex-col items-center gap-6 scroll-mt-24">
         <h3 className="text-xl font-semibold text-[var(--color-text)]">Why this is different</h3>
@@ -41,12 +44,16 @@ export function Landing({ onTryDemo }: LandingProps) {
 
       <div id="architecture" className="w-full flex flex-col items-center gap-6 scroll-mt-24">
         <h3 className="text-xl font-semibold text-[var(--color-text)]">How it works</h3>
-        <ArchitectureVisual />
+        <Reveal className="w-full flex justify-center">
+          <ArchitectureVisual />
+        </Reveal>
       </div>
 
       <div className="w-full flex flex-col items-center gap-6">
         <h3 className="text-xl font-semibold text-[var(--color-text)]">Built with</h3>
-        <TechStackBadges />
+        <Reveal>
+          <TechStackBadges />
+        </Reveal>
       </div>
 
       <div className="w-full h-px" style={{ background: "var(--color-border)" }} />

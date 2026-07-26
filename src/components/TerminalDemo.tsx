@@ -93,7 +93,7 @@ export function TerminalDemo() {
   }, [phase]);
 
   return (
-    <div className="clay w-full max-w-2xl p-3" aria-hidden="true">
+    <div className="clay float-animate w-full max-w-2xl p-3" aria-hidden="true">
       {/* Header bar with clay-style traffic-light dots */}
       <div className="flex items-center gap-2 px-3 py-2">
         <span className="h-3 w-3 rounded-full" style={{ background: "#e6a099" }} />

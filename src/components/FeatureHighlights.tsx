@@ -1,3 +1,5 @@
+import { Reveal } from "./Reveal";
+
 interface Highlight {
   title: string;
   description: string;
@@ -29,11 +31,13 @@ const HIGHLIGHTS: Highlight[] = [
 export function FeatureHighlights() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-      {HIGHLIGHTS.map((h) => (
-        <div key={h.title} className="clay p-5">
-          <p className="font-semibold text-[var(--color-text)]">{h.title}</p>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">{h.description}</p>
-        </div>
+      {HIGHLIGHTS.map((h, i) => (
+        <Reveal key={h.title} delayMs={i * 100}>
+          <div className="clay p-5">
+            <p className="font-semibold text-[var(--color-text)]">{h.title}</p>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{h.description}</p>
+          </div>
+        </Reveal>
       ))}
     </div>
   );
