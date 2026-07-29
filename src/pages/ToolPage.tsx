@@ -91,7 +91,9 @@ export function ToolPage() {
           </div>
         )}
 
-        {csv.data && <AskBar onAsk={ask.ask} isBusy={isBusy} />}
+        {csv.data && (
+          <AskBar onAsk={ask.ask} isBusy={isBusy} cooldownUntil={ask.cooldownUntil} />
+        )}
 
         {csv.data && isSampleData && ask.turns.length === 0 && (
           <SampleQuestions onAsk={ask.ask} isBusy={isBusy} />

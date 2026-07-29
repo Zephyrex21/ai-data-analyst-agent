@@ -89,6 +89,12 @@ Both engines — this rule applies either way:
 
 const MAX_HISTORY_TURNS = 5;
 
+// Minimal structured logging so failures show up in Vercel's function logs
+// instead of being silent. Never logs question/schema content (user data).
+function log(event: string, data: Record<string, unknown> = {}): void {
+  console.log(JSON.stringify({ event, ts: new Date().toISOString(), ...data }));
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed." }, 405);
@@ -116,6 +122,11 @@ export default async function handler(req: Request): Promise<Response> {
   if (!question?.trim() || !schemaDescription?.trim()) {
     return jsonResponse({ error: "Missing question or schemaDescription." }, 400);
   }
+
+  log("request_received", {
+    isRetry: Boolean(previousAttempt),
+    historyLength: history?.length ?? 0,
+  });
 
   let userPrompt = `Schema:\n${schemaDescription}`;
 
@@ -160,6 +171,15 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (!groqRes.ok) {
       const errText = await groqRes.text();
+      log("groq_error", { status: groqRes.status });
+
+      if (groqRes.status === 429) {
+        return jsonResponse(
+          { error: "The demo is popular right now — please try again in a moment." },
+          429
+        );
+      }
+
       return jsonResponse(
         { error: `Groq API error (${groqRes.status}): ${errText.slice(0, 300)}` },
         502
@@ -199,6 +219,9 @@ export default async function handler(req: Request): Promise<Response> {
 
     return jsonResponse({ engine: parsed.engine, code }, 200);
   } catch (err) {
+    log("unhandled_exception", {
+      message: err instanceof Error ? err.message : String(err),
+    });
     return jsonResponse(
       { error: err instanceof Error ? err.message : "Unknown error calling Groq." },
       500

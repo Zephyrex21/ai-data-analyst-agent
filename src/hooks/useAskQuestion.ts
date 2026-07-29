@@ -16,6 +16,12 @@ export type AskStage = OrchestratorStage;
 // How many prior turns get sent to the model as conversation context.
 const MAX_HISTORY_TURNS = 5;
 
+// Minimum gap enforced between two asks, client-side. This isn't about
+// making the LLM faster — it's so one person mashing the Ask button (or
+// hitting Enter repeatedly) can't burn through the shared free-tier Groq
+// quota that every visitor to the live demo draws from.
+const COOLDOWN_MS = 3000;
+
 let nextTurnId = 1;
 
 export interface ConversationTurn {
@@ -39,12 +45,16 @@ function updateTurn(
 
 export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
 
   const isBusy = turns.length > 0 && !["done", "error"].includes(turns[turns.length - 1].stage);
 
   const ask = useCallback(
     async (question: string) => {
       if (!csvData || !file || !question.trim() || isBusy) return;
+      if (Date.now() < cooldownUntil) return; // still cooling down — ignore silently
+
+      setCooldownUntil(Date.now() + COOLDOWN_MS);
 
       const id = nextTurnId++;
       const newTurn: ConversationTurn = {
@@ -82,7 +92,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         setTurns((prev) => updateTurn(prev, id, update));
       }
     },
-    [csvData, file, isBusy, turns]
+    [csvData, file, isBusy, turns, cooldownUntil]
   );
 
   const reset = useCallback(() => {
@@ -90,5 +100,5 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
     resetPythonState();
   }, []);
 
-  return { turns, isBusy, ask, reset };
+  return { turns, isBusy, ask, reset, cooldownUntil };
 }
