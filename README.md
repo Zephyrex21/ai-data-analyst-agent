@@ -40,7 +40,7 @@ Everything except the LLM call runs **entirely in your browser** — DuckDB-WASM
 | Groq (`openai/gpt-oss-120b`) | Free tier, fast enough that "AI thinking" doesn't feel like a loading screen |
 | Validation layer, not just prompting | An LLM will occasionally write `MAX revenue` instead of `MAX(revenue)`, or invent a `profit_margin` column that doesn't exist. Prompting reduces this; a real validator catches what prompting misses |
 | Self-correction loop | When validation or execution fails, the exact error is fed back to the model for a fix — turns "rejected" into "usually just works" |
-| Vitest + CI | 55 tests, including mocked integration tests of the retry loop itself (not just the validators) — CI runs on every push |
+| Vitest + CI | 72 tests, including mocked integration tests of the retry loop itself (not just the validators) and CSV edge cases (BOM, encodings, delimiters, line endings, size caps) — CI runs on every push |
 
 ## Local development
 

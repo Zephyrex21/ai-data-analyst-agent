@@ -20,6 +20,14 @@ export interface ParsedCsv {
 const MAX_ACCEPTED_SIZE_BYTES = 25 * 1024 * 1024; // 25MB — generous for a client-side demo
 const TYPE_SAMPLE_SIZE = 100;
 
+// If a file isn't actually UTF-8 (e.g. saved as Windows-1252/Latin-1 from
+// Excel), the browser's decoder swaps undecodable bytes for U+FFFD. That's
+// not a crash — parsing still "succeeds" — but the data is silently
+// corrupted unless we say something. Sample a bounded number of rows rather
+// than scanning everything, so this stays cheap even near the size cap.
+const ENCODING_SAMPLE_ROWS = 200;
+const REPLACEMENT_CHAR = "\uFFFD";
+
 const BOOLEAN_VALUES = new Set([
   "true",
   "false",
@@ -71,6 +79,13 @@ function inferColumnType(values: string[]): ColumnType {
   return "string";
 }
 
+function detectEncodingIssue(rows: Record<string, string>[]): boolean {
+  const sample = rows.slice(0, ENCODING_SAMPLE_ROWS);
+  return sample.some((row) =>
+    Object.values(row).some((v) => typeof v === "string" && v.includes(REPLACEMENT_CHAR))
+  );
+}
+
 export function parseCsvFile(file: File): Promise<ParsedCsv> {
   return new Promise((resolve, reject) => {
     try {
@@ -118,6 +133,13 @@ export function parseCsvFile(file: File): Promise<ParsedCsv> {
             `${emptyColumns.length} column(s) appear to be entirely empty: ${emptyColumns
               .map((c) => c.name)
               .join(", ")}.`
+          );
+        }
+
+        if (detectEncodingIssue(result.data)) {
+          warnings.push(
+            "Some characters couldn't be read correctly and were replaced with \uFFFD — " +
+              "this file may not be UTF-8 encoded. Try re-saving it as UTF-8 if the data looks garbled."
           );
         }
 
