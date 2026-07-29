@@ -31,6 +31,10 @@ import { validateSql } from "../src/lib/sqlValidator";
 
 const BASE_URL = process.env.EVAL_BASE_URL ?? "http://localhost:3000";
 const ENDPOINT = `${BASE_URL}/api/generate-query`;
+// Which provider the eval set exercises. Defaults to Groq since that's the
+// original/primary provider; pass EVAL_PROVIDER=gemini to run the same 18
+// cases against Gemini instead (needs GEMINI_API_KEY set for `vercel dev`).
+const PROVIDER = process.env.EVAL_PROVIDER === "gemini" ? "gemini" : "groq";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const csvPath = path.join(__dirname, "..", "public", "sample-sales-data.csv");
@@ -61,7 +65,7 @@ async function callApi(question: string, history?: HistoryTurn[]): Promise<ApiRe
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, schemaDescription, history }),
+    body: JSON.stringify({ question, schemaDescription, history, provider: PROVIDER }),
   });
   const body = await res.json().catch(() => ({}));
   return { status: res.status, body };

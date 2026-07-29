@@ -18,6 +18,12 @@ Against a deployed URL instead of local:
 EVAL_BASE_URL=https://your-app.vercel.app npm run eval
 ```
 
+Runs against Groq by default; to check the same 18 cases against Gemini instead:
+
+```bash
+EVAL_PROVIDER=gemini npm run eval
+```
+
 ## What it checks
 
 For each question: right engine (SQL vs Python), non-empty code, the

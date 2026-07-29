@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import type { AskStage, ConversationTurn } from "../hooks/useAskQuestion";
 import type { Engine } from "../lib/llm";
+import { PROVIDER_OPTIONS } from "../lib/providers";
 import { chooseChartType, isSingleScalar } from "../lib/chartSelection";
 import { BigNumberDisplay } from "./BigNumberDisplay";
 import { ResultTable } from "./ResultTable";
@@ -32,7 +33,7 @@ const ENGINE_BADGE_STYLES: Record<Engine, string> = {
 };
 
 export function AnswerCard({ turn, number }: AnswerCardProps) {
-  const { stage, question, engine, result, error, attemptsUsed } = turn;
+  const { stage, question, engine, provider, result, error, attemptsUsed } = turn;
 
   const isBusy =
     stage === "generating-sql" ||
@@ -41,6 +42,7 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
     stage === "running-query";
   const chartSpec = result ? chooseChartType(result) : null;
   const showBigNumber = result ? isSingleScalar(result) : false;
+  const providerLabel = PROVIDER_OPTIONS.find((p) => p.id === provider)?.label ?? provider;
 
   return (
     <div className="turn-enter flex gap-3 w-full">
@@ -62,6 +64,11 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
               className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${ENGINE_BADGE_STYLES[engine]}`}
             >
               {engine === "sql" ? "SQL" : "Python"}
+            </span>
+          )}
+          {engine && (
+            <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]">
+              {providerLabel}
             </span>
           )}
           {stage === "done" && attemptsUsed > 1 && (

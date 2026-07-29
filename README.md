@@ -1,14 +1,14 @@
 # AI Data Analyst Agent
 
 [![CI](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-72%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-83%20passing-brightgreen)
 ![zero server cost](https://img.shields.io/badge/server%20cost-%240-blue)
 
 > Badge repo path assumes `Zephyrex21/ai-data-analyst-agent` — update if the actual GitHub repo name differs.
 
 Upload a CSV, ask questions about it in plain English, get a real, verified, executed answer back — not a guess. **[Try it live →](https://ai-data-analyst-agent-one.vercel.app/)** (loads a sample dataset with one click, no upload required).
 
-**Data privacy, in one line:** your CSV never leaves your browser — DuckDB and Python both run client-side; the only thing that touches a server is the plain-text question itself, sent to Groq's API to generate query code (never your data).
+**Data privacy, in one line:** your CSV never leaves your browser — DuckDB and Python both run client-side; the only thing that touches a server is the plain-text question itself, sent to whichever model provider (Groq or Gemini) you've selected to generate query code (never your data).
 
 ## The problem this solves
 
@@ -24,7 +24,7 @@ flowchart TD
     P --> D["DuckDB-WASM<br/>(in-browser SQL engine)"]
 
     Q["Question<br/>(plain English)"] --> E["Edge Function<br/>/api/generate-query"]
-    E --> G["Groq LLM<br/>(openai/gpt-oss-120b)"]
+    E --> G["Groq or Gemini<br/>(user-selected)"]
     G -->|"SQL or Python + engine choice"| V{"Validator"}
 
     V -->|"SQL"| D
@@ -37,7 +37,7 @@ flowchart TD
     RES --> C["Chart / table / big number"]
 ```
 
-Everything except the LLM call runs **entirely in your browser** — DuckDB-WASM for SQL, Pyodide (in a Web Worker, so it never freezes the UI) for statistical Python. The only server-side code is a small serverless function that proxies the Groq API call so the key never reaches the client.
+Everything except the LLM call runs **entirely in your browser** — DuckDB-WASM for SQL, Pyodide (in a Web Worker, so it never freezes the UI) for statistical Python. The only server-side code is a small serverless function that proxies whichever model provider is selected, so no API key ever reaches the client.
 
 ## Screenshots
 
@@ -53,10 +53,10 @@ Everything except the LLM call runs **entirely in your browser** — DuckDB-WASM
 |---|---|
 | DuckDB-WASM over a backend DB | Zero server cost, zero server security surface — nothing executes anywhere but the user's own browser |
 | Pyodide in a **Web Worker** | Running Python/pandas on the main thread would freeze the UI during the ~10-20s first load; the worker keeps the page responsive |
-| Groq (`openai/gpt-oss-120b`) | Free tier, fast enough that "AI thinking" doesn't feel like a loading screen |
+| Groq (`openai/gpt-oss-120b`) + Gemini (`gemini-2.5-flash`), user-selectable | Both have workable free tiers; letting the person pick means one provider's rate limit or an outage doesn't take the whole demo down |
 | Validation layer, not just prompting | An LLM will occasionally write `MAX revenue` instead of `MAX(revenue)`, or invent a `profit_margin` column that doesn't exist. Prompting reduces this; a real validator catches what prompting misses |
 | Self-correction loop | When validation or execution fails, the exact error is fed back to the model for a fix — turns "rejected" into "usually just works" |
-| Vitest + CI | 72 tests, including mocked integration tests of the retry loop itself (not just the validators) and CSV edge cases (BOM, encodings, delimiters, line endings, size caps) — CI runs on every push |
+| Vitest + CI | 83 tests, including mocked integration tests of the retry loop itself (not just the validators) and CSV edge cases (BOM, encodings, delimiters, line endings, size caps) — CI runs on every push |
 
 ## Local development
 
@@ -65,11 +65,11 @@ This project has a Vercel serverless function (`/api/generate-query.ts`), so pla
 ```
 npm install -g vercel
 npm install
-cp .env.local.example .env.local   # then paste your real Groq key into .env.local
+cp .env.local.example .env.local   # then paste your real key(s) into .env.local
 vercel dev
 ```
 
-Get a free Groq API key (no card required) at https://console.groq.com.
+Get a free Groq API key (no card required) at https://console.groq.com. The Gemini option is optional — get a free key at https://aistudio.google.com/apikey and add `GEMINI_API_KEY` too if you want it; without it, the Gemini option in the selector will just return a clear "missing key" error instead of breaking anything else.
 
 ## Testing
 
@@ -78,18 +78,19 @@ npm test          # run once
 npm run test:watch
 ```
 
-72 tests: CSV parsing (including edge cases — BOM, non-UTF-8 encodings, delimiters, line endings, size caps), the SQL/Python validators, chart-type selection, conversation-history summarization, a sanity check on the bundled sample dataset, and integration tests of the generate→validate→execute→retry orchestration loop (mocked LLM/execution, no network needed). CI (`.github/workflows/ci.yml`) runs the full suite plus a production build on every push and pull request to `main`.
+83 tests: CSV parsing (including edge cases — BOM, non-UTF-8 encodings, delimiters, line endings, size caps), the SQL/Python validators, chart-type selection, conversation-history summarization, a sanity check on the bundled sample dataset, the Groq/Gemini provider abstraction (mocked fetch — no real API calls or keys needed), and integration tests of the generate→validate→execute→retry orchestration loop (mocked LLM/execution, no network needed). CI (`.github/workflows/ci.yml`) runs the full suite plus a production build on every push and pull request to `main`.
 
 There's also a separate, non-CI eval suite (`npm run eval`) that hits the real LLM against 18 questions to catch prompt regressions — see `eval-set.md` for why it's deliberately kept out of CI.
 
 ## Deploying
 
-Push to GitHub, import the repo in Vercel, then add `GROQ_API_KEY` under Project Settings → Environment Variables and redeploy.
+Push to GitHub, import the repo in Vercel, then add `GROQ_API_KEY` (and optionally `GEMINI_API_KEY`) under Project Settings → Environment Variables and redeploy.
 
 ## Feature overview
 
 - Drag-and-drop CSV upload with client-side type inference, malformed-row handling, and a one-click bundled sample dataset (1,440 rows, 90 days, 4 regions/products) for zero-setup demos
 - Natural language → SQL (DuckDB-WASM) or Python (Pyodide/pandas), router picks the engine per question
+- Switchable model provider (Groq or Gemini) via a selector — the choice is remembered and shown per-answer
 - Charts auto-selected by result shape (pie/bar/line/big-number), tables always available as ground truth
 - Safety validator: blocks non-SELECT statements, unknown tables/columns, unsafe Python patterns; caps result size
 - Self-correcting retry loop (max 3 attempts) with full error context fed back to the model

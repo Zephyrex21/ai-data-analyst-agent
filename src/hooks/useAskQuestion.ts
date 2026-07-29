@@ -10,6 +10,7 @@ import {
   resetPythonState,
 } from "../lib/pyodide";
 import { runQueryWithRetries, type OrchestratorStage } from "../lib/queryOrchestrator";
+import { DEFAULT_PROVIDER, isProviderId, type ProviderId } from "../lib/providers";
 
 export type AskStage = OrchestratorStage;
 
@@ -22,6 +23,20 @@ const MAX_HISTORY_TURNS = 5;
 // quota that every visitor to the live demo draws from.
 const COOLDOWN_MS = 3000;
 
+const PROVIDER_STORAGE_KEY = "ai-data-analyst:provider";
+
+function loadStoredProvider(): ProviderId {
+  if (typeof window === "undefined") return DEFAULT_PROVIDER;
+  try {
+    const stored = window.localStorage.getItem(PROVIDER_STORAGE_KEY);
+    return isProviderId(stored) ? stored : DEFAULT_PROVIDER;
+  } catch {
+    // localStorage can throw in locked-down/private-browsing contexts —
+    // falling back to the default is safe, this is just a remembered preference.
+    return DEFAULT_PROVIDER;
+  }
+}
+
 let nextTurnId = 1;
 
 export interface ConversationTurn {
@@ -30,6 +45,7 @@ export interface ConversationTurn {
   question: string;
   sql: string | null;
   engine: Engine | null;
+  provider: ProviderId;
   result: QueryResult | null;
   error: string | null;
   attemptsUsed: number;
@@ -46,6 +62,16 @@ function updateTurn(
 export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [provider, setProviderState] = useState<ProviderId>(loadStoredProvider);
+
+  const setProvider = useCallback((next: ProviderId) => {
+    setProviderState(next);
+    try {
+      window.localStorage.setItem(PROVIDER_STORAGE_KEY, next);
+    } catch {
+      // Best-effort persistence only — not fatal if storage is unavailable.
+    }
+  }, []);
 
   const isBusy = turns.length > 0 && !["done", "error"].includes(turns[turns.length - 1].stage);
 
@@ -63,6 +89,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         question,
         sql: null,
         engine: null,
+        provider,
         result: null,
         error: null,
         attemptsUsed: 0,
@@ -81,7 +108,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
       setTurns((prev) => [...prev, newTurn]);
 
       const generator = runQueryWithRetries(question, csvData, history, {
-        generateQuery,
+        generateQuery: (q, s, p, h) => generateQuery(q, s, p, h, provider),
         runSql: runQuery,
         runPython: runPythonCode,
         isDataFrameLoaded: () => isDataFrameLoaded(file),
@@ -92,7 +119,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         setTurns((prev) => updateTurn(prev, id, update));
       }
     },
-    [csvData, file, isBusy, turns, cooldownUntil]
+    [csvData, file, isBusy, turns, cooldownUntil, provider]
   );
 
   const reset = useCallback(() => {
@@ -100,5 +127,5 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
     resetPythonState();
   }, []);
 
-  return { turns, isBusy, ask, reset, cooldownUntil };
+  return { turns, isBusy, ask, reset, cooldownUntil, provider, setProvider };
 }

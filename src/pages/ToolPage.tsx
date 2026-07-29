@@ -6,6 +6,7 @@ import { useAskQuestion } from "../hooks/useAskQuestion";
 import { FileUpload } from "../components/FileUpload";
 import { DataTable } from "../components/DataTable";
 import { AskBar } from "../components/AskBar";
+import { ProviderSelector } from "../components/ProviderSelector";
 import { AnswerCard } from "../components/AnswerCard";
 import { SampleQuestions } from "../components/SampleQuestions";
 import { Navbar } from "../components/Navbar";
@@ -88,6 +89,13 @@ export function ToolPage() {
         {duckDb.tableError && (
           <div className="rounded-2xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             DuckDB error: {duckDb.tableError}
+          </div>
+        )}
+
+        {csv.data && (
+          <div className="flex items-center justify-end gap-2">
+            <span className="text-xs text-[var(--color-text-muted)]">Model:</span>
+            <ProviderSelector value={ask.provider} onChange={ask.setProvider} disabled={isBusy} />
           </div>
         )}
 

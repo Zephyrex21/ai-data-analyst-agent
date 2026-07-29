@@ -30,7 +30,8 @@ export async function generateQuery(
   question: string,
   schemaDescription: string,
   previousAttempt?: PreviousAttempt | null,
-  history?: HistoryTurn[]
+  history?: HistoryTurn[],
+  provider?: string
 ): Promise<GeneratedQuery> {
   let res: Response;
   try {
@@ -42,6 +43,7 @@ export async function generateQuery(
         schemaDescription,
         previousAttempt: previousAttempt ?? null,
         history: history ?? [],
+        provider,
       }),
     });
   } catch {

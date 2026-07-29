@@ -1,9 +1,6 @@
-export const config = { runtime: "edge" };
+import { PROVIDERS, DEFAULT_PROVIDER, isProviderId, ProviderError, type ProviderId } from "./providers";
 
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-// llama-3.3-70b-versatile was deprecated by Groq (announced June 17 2026,
-// shuts down August 16 2026). Using their recommended replacement instead.
-const MODEL = "openai/gpt-oss-120b";
+export const config = { runtime: "edge" };
 
 type Engine = "sql" | "python";
 
@@ -25,6 +22,7 @@ interface RequestBody {
   schemaDescription?: string;
   previousAttempt?: PreviousAttempt | null;
   history?: HistoryTurn[];
+  provider?: string;
 }
 
 const SYSTEM_PROMPT = `You are a data analysis assistant. Given a table schema and a question in plain English,
@@ -100,17 +98,6 @@ export default async function handler(req: Request): Promise<Response> {
     return jsonResponse({ error: "Method not allowed." }, 405);
   }
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return jsonResponse(
-      {
-        error:
-          "Server is missing GROQ_API_KEY. Add it in your Vercel project's Environment Variables, then redeploy.",
-      },
-      500
-    );
-  }
-
   let body: RequestBody;
   try {
     body = await req.json();
@@ -123,7 +110,23 @@ export default async function handler(req: Request): Promise<Response> {
     return jsonResponse({ error: "Missing question or schemaDescription." }, 400);
   }
 
+  // Whitelist the provider explicitly — never let a client-supplied string
+  // pick which env var/key gets read.
+  const provider: ProviderId = isProviderId(body.provider) ? body.provider : DEFAULT_PROVIDER;
+  const providerConfig = PROVIDERS[provider];
+
+  const apiKey = process.env[providerConfig.envKey];
+  if (!apiKey) {
+    return jsonResponse(
+      {
+        error: `Server is missing ${providerConfig.envKey}. Add it in your Vercel project's Environment Variables, then redeploy.`,
+      },
+      500
+    );
+  }
+
   log("request_received", {
+    provider,
     isRetry: Boolean(previousAttempt),
     historyLength: history?.length ?? 0,
   });
@@ -149,48 +152,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const groqRes = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: 0,
-        max_tokens: 1024,
-        reasoning_effort: "low",
-        reasoning_format: "hidden",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    });
-
-    if (!groqRes.ok) {
-      const errText = await groqRes.text();
-      log("groq_error", { status: groqRes.status });
-
-      if (groqRes.status === 429) {
-        return jsonResponse(
-          { error: "The demo is popular right now — please try again in a moment." },
-          429
-        );
-      }
-
-      return jsonResponse(
-        { error: `Groq API error (${groqRes.status}): ${errText.slice(0, 300)}` },
-        502
-      );
-    }
-
-    const data = await groqRes.json();
-    const raw: string | undefined = data?.choices?.[0]?.message?.content;
-    if (!raw) {
-      return jsonResponse({ error: "Groq returned an empty response." }, 502);
-    }
+    const raw = await providerConfig.call(apiKey, SYSTEM_PROMPT, userPrompt);
 
     const parsed = parseModelJson(raw);
     if (!parsed) {
@@ -214,16 +176,20 @@ export default async function handler(req: Request): Promise<Response> {
       return jsonResponse({ error: "Model response was missing code." }, 502);
     }
 
-    const code =
-      parsed.engine === "sql" ? cleanSql(parsed.code) : parsed.code.trim();
+    const code = parsed.engine === "sql" ? cleanSql(parsed.code) : parsed.code.trim();
 
-    return jsonResponse({ engine: parsed.engine, code }, 200);
+    return jsonResponse({ engine: parsed.engine, code, provider }, 200);
   } catch (err) {
+    if (err instanceof ProviderError) {
+      log("provider_error", { provider, status: err.status });
+      return jsonResponse({ error: err.message }, err.status);
+    }
     log("unhandled_exception", {
+      provider,
       message: err instanceof Error ? err.message : String(err),
     });
     return jsonResponse(
-      { error: err instanceof Error ? err.message : "Unknown error calling Groq." },
+      { error: err instanceof Error ? err.message : "Unknown error calling the model." },
       500
     );
   }

@@ -11,6 +11,6 @@ export default defineConfig({
     // via papaparse, which needs a proper browser-like environment to detect
     // it's not running inside a Worker.
     environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'api/**/*.test.ts'],
   },
 })
