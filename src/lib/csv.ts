@@ -61,7 +61,7 @@ export function assertIsCsvFile(file: File): void {
   }
 }
 
-function inferColumnType(values: string[]): ColumnType {
+export function inferColumnType(values: string[]): ColumnType {
   const nonEmpty = values.filter((v) => v !== undefined && v !== null && v !== "");
   if (nonEmpty.length === 0) return "empty";
 
