@@ -96,7 +96,7 @@ export function ToolPage() {
         )}
 
         {csv.data && isSampleData && ask.turns.length === 0 && (
-          <SampleQuestions onAsk={ask.ask} isBusy={isBusy} />
+          <SampleQuestions onAsk={ask.ask} isBusy={isBusy} cooldownUntil={ask.cooldownUntil} />
         )}
 
         {csv.data && duckDb.isLoadingTable && (

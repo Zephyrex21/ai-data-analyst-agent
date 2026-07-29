@@ -1,6 +1,14 @@
 # AI Data Analyst Agent
 
+[![CI](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml)
+![tests](https://img.shields.io/badge/tests-72%20passing-brightgreen)
+![zero server cost](https://img.shields.io/badge/server%20cost-%240-blue)
+
+> Badge repo path assumes `Zephyrex21/ai-data-analyst-agent` — update if the actual GitHub repo name differs.
+
 Upload a CSV, ask questions about it in plain English, get a real, verified, executed answer back — not a guess. **[Try it live →](https://ai-data-analyst-agent-one.vercel.app/)** (loads a sample dataset with one click, no upload required).
+
+**Data privacy, in one line:** your CSV never leaves your browser — DuckDB and Python both run client-side; the only thing that touches a server is the plain-text question itself, sent to Groq's API to generate query code (never your data).
 
 ## The problem this solves
 
@@ -30,6 +38,15 @@ flowchart TD
 ```
 
 Everything except the LLM call runs **entirely in your browser** — DuckDB-WASM for SQL, Pyodide (in a Web Worker, so it never freezes the UI) for statistical Python. The only server-side code is a small serverless function that proxies the Groq API call so the key never reaches the client.
+
+## Screenshots
+
+<!-- TODO: replace with real screenshots before sharing this README externally.
+     Suggested shots: (1) homepage, (2) a SQL-answered question with chart + "show code" open,
+     (3) a Python-answered question (engine badge visible), (4) the honest-decline case
+     ("what's the profit margin?"), (5) dark mode. -->
+
+*Screenshots coming soon — see `demo-script.md` for the shot list this section will use.*
 
 ## Why these specific choices
 
@@ -62,7 +79,9 @@ npm test          # run once
 npm run test:watch
 ```
 
-55 tests: CSV parsing, the SQL/Python validators, chart-type selection, conversation-history summarization, a sanity check on the bundled sample dataset, and integration tests of the generate→validate→execute→retry orchestration loop (mocked LLM/execution, no network needed). CI (`.github/workflows/ci.yml`) runs the full suite plus a production build on every push and pull request to `main`.
+72 tests: CSV parsing (including edge cases — BOM, non-UTF-8 encodings, delimiters, line endings, size caps), the SQL/Python validators, chart-type selection, conversation-history summarization, a sanity check on the bundled sample dataset, and integration tests of the generate→validate→execute→retry orchestration loop (mocked LLM/execution, no network needed). CI (`.github/workflows/ci.yml`) runs the full suite plus a production build on every push and pull request to `main`.
+
+There's also a separate, non-CI eval suite (`npm run eval`) that hits the real LLM against 18 questions to catch prompt regressions — see `eval-set.md` for why it's deliberately kept out of CI.
 
 ## Deploying
 
@@ -83,3 +102,9 @@ Push to GitHub, import the repo in Vercel, then add `GROQ_API_KEY` under Project
 - Single flat table only — no joins, no multi-file uploads, no CTEs (a deliberate scope decision, documented in `sqlValidator.ts`)
 - The SQL/Python validators are heuristic, not full parsers — they catch destructive statements and hallucinated columns, not every possible malformed query (that's what the retry loop is for)
 - No auth/persistence — this is a stateless, single-session tool by design
+
+## More
+
+- [`ENGINEERING_JOURNAL.md`](./ENGINEERING_JOURNAL.md) — five real bugs found and fixed during this build, and what each one actually taught
+- [`demo-script.md`](./demo-script.md) — a ~60-90s shot list for a demo video
+- [`eval-set.md`](./eval-set.md) — how the prompt itself gets regression-tested
