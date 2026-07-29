@@ -41,12 +41,13 @@ Everything except the LLM call runs **entirely in your browser** — DuckDB-WASM
 
 ## Screenshots
 
-<!-- TODO: replace with real screenshots before sharing this README externally.
-     Suggested shots: (1) homepage, (2) a SQL-answered question with chart + "show code" open,
-     (3) a Python-answered question (engine badge visible), (4) the honest-decline case
-     ("what's the profit margin?"), (5) dark mode. -->
+| | |
+|---|---|
+| ![Homepage](docs/screenshots/01-homepage.png) Homepage | ![SQL-answered question](docs/screenshots/02-sql-answer-chart.png) SQL answer, chart + code shown |
+| ![Python-answered question](docs/screenshots/03-python-answer.png) Python-answered question | ![Honest decline](docs/screenshots/04-honest-decline.png) Honest decline (no fabricated number) |
+| ![Dark mode](docs/screenshots/05-dark-mode.png) Dark mode | |
 
-*Screenshots coming soon — see `demo-script.md` for the shot list this section will use.*
+*(See `demo-script.md` for the full shot list these are drawn from.)*
 
 ## Why these specific choices
 
