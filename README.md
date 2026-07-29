@@ -44,10 +44,8 @@ Everything except the LLM call runs **entirely in your browser** — DuckDB-WASM
 | | |
 |---|---|
 | ![Homepage](docs/screenshots/01-homepage.png) Homepage | ![SQL-answered question](docs/screenshots/02-sql-answer-chart.png) SQL answer, chart + code shown |
-| ![Python-answered question](docs/screenshots/03-python-answer.png) Python-answered question | ![Honest decline](docs/screenshots/04-honest-decline.png) Honest decline (no fabricated number) |
-| ![Dark mode](docs/screenshots/05-dark-mode.png) Dark mode | |
 
-*(See `demo-script.md` for the full shot list these are drawn from.)*
+*(See `demo-script.md` for the full shot list.)*
 
 ## Why these specific choices
 
