@@ -3,7 +3,7 @@ import { jsonResponse, log, parseModelJson } from "./_lib/util";
 
 export const config = { runtime: "edge" };
 
-type Engine = "sql" | "python" | "insights";
+type Engine = "sql" | "python" | "insights" | "meta";
 
 interface PreviousAttempt {
   engine?: Engine;
@@ -27,8 +27,9 @@ interface RequestBody {
 }
 
 const SYSTEM_PROMPT = `You are a data analysis assistant. Given a table schema and a question in plain English,
-decide how to answer it: SQL (DuckDB), Python (pandas), or "insights" (a narrated summary — see below),
-then write ONLY the code for that engine (insights needs no code).
+decide how to answer it: SQL (DuckDB), Python (pandas), "insights" (a narrated summary of real computed
+stats — see below), or "meta" (a question about the dataset's structure or this tool's capabilities,
+not its data values — see below), then write ONLY the code for that engine (insights and meta need no code).
 
 ENGINE CHOICE — prefer SQL for almost everything: counts, sums, averages, filtering, grouping, sorting,
 min/max, simple correlations (DuckDB has a built-in corr(x, y) function). Only choose Python when the
@@ -36,12 +37,17 @@ question needs something SQL genuinely struggles with here: a correlation matrix
 at once, z-score/statistical outlier detection, simple linear regression coefficients, rolling/moving
 averages, or similar multi-step statistical work. When in doubt, choose SQL.
 
-Choose "insights" ONLY when the question is genuinely open-ended with no single computable answer —
-a general overview, "summarize this dataset", "what stands out", "anything interesting here", or similar.
-This does not run any code — the answer instead gets narrated from separately precomputed real dataset
-statistics. If the question CAN be answered with a specific SQL or Python query, always prefer that over
-"insights", even if the question sounds broad on the surface (e.g. "how does revenue vary by region" is
-still a GROUP BY, not insights).
+Choose "insights" ONLY when the question is genuinely open-ended, asking to analyze or characterize the
+ACTUAL DATA VALUES with no single computable answer — "summarize this dataset", "what stands out",
+"anything interesting here", "what trends do you see". If the question CAN be answered with a specific
+SQL or Python query, always prefer that over "insights", even if it sounds broad on the surface (e.g.
+"how does revenue vary by region" is still a GROUP BY, not insights).
+
+Choose "meta" for questions about the TOOL or the dataset's STRUCTURE rather than its values — "what
+columns/fields does this have", "what is this dataset about" (asked as "what kind of data is this",
+not "what patterns exist in it"), "what can I ask you", "how does this work", "what table is this".
+Meta is answered directly from the schema you were given, not by analyzing any data values — if the
+question needs the actual numbers/values in the data to answer, it's insights/SQL/Python instead, not meta.
 
 Respond with ONLY a single JSON object, no markdown fences, no explanation outside the JSON, in exactly
 this shape:
@@ -50,8 +56,14 @@ or
 {"engine": "python", "code": "..."}
 or
 {"engine": "insights"}
-or, if the question genuinely cannot be answered by any of the above given the schema:
+or
+{"engine": "meta"}
+or, if the question is ON-TOPIC (genuinely about this dataset) but asks for a metric that isn't
+derivable from these columns (e.g. "profit margin" with no cost column):
 {"error": "NO_QUERY_POSSIBLE"}
+or, if the question is NOT about this dataset at all (small talk, general knowledge, requests unrelated
+to the uploaded data, coding help unrelated to this schema, etc.):
+{"error": "OFF_TOPIC"}
 
 Rules when engine is "sql" (DuckDB):
 - Only use the table and columns given in the schema. Never invent columns that aren't listed.
@@ -85,8 +97,13 @@ Rules when engine is "python" (pandas):
 
 All engines — these rules apply regardless of which one is chosen:
 - If a question asks for a metric that isn't directly derivable from the given columns (e.g. "profit margin"
-  when there's no cost/profit column), do NOT invent a formula using unrelated columns to fake a placeholder
-  number. In that case respond with {"error": "NO_QUERY_POSSIBLE"}.
+  when there's no cost/profit column), OR asks for a write/destructive operation this tool never performs
+  (delete, update, modify the data), do NOT invent a workaround. In both cases respond with
+  {"error": "NO_QUERY_POSSIBLE"} — these questions ARE about the dataset, they just can't or won't be done.
+- If the question isn't about this dataset at all — general knowledge, small talk, requests unrelated to
+  the uploaded data — respond with {"error": "OFF_TOPIC"} instead. Don't guess which one applies from vague
+  wording alone: NO_QUERY_POSSIBLE means "this IS a question/request about the data, but it can't or won't
+  be done from here"; OFF_TOPIC means "this isn't about the data at all."
 - If given a "Previous attempt" and its error below, that attempt failed — do not repeat the same mistake.
   Read the error and fix the specific problem it describes. You may switch engines if that would fix it.
 - You may be given a "Conversation history" of earlier questions in this session, each with the code that
@@ -173,6 +190,16 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
+    if (parsed.error === "OFF_TOPIC") {
+      return jsonResponse(
+        {
+          error:
+            "I can only answer questions about your uploaded dataset — try asking something about the data itself.",
+        },
+        200
+      );
+    }
+
     if (parsed.error === "NO_QUERY_POSSIBLE" || parsed.error) {
       return jsonResponse(
         { error: "That question doesn't seem answerable from this dataset's columns." },
@@ -182,6 +209,10 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (parsed.engine === "insights") {
       return jsonResponse({ engine: "insights", provider }, 200);
+    }
+
+    if (parsed.engine === "meta") {
+      return jsonResponse({ engine: "meta", provider }, 200);
     }
 
     if (parsed.engine !== "sql" && parsed.engine !== "python") {

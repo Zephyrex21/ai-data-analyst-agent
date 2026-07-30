@@ -4,6 +4,7 @@ import { summarizeResultForHistory } from "../lib/schema";
 import { generateQuery, generateInsight, type Engine, type HistoryTurn } from "../lib/llm";
 import { runQuery, type QueryResult } from "../lib/duckdb";
 import { computeDatasetSummary, formatDatasetSummaryForPrompt } from "../lib/datasetSummary";
+import { buildMetaAnswer } from "../lib/metaAnswer";
 import {
   loadCsvIntoDataframe,
   runPythonCode,
@@ -108,7 +109,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
           engine: t.engine as Engine,
           code: t.sql ?? "",
           resultSummary:
-            t.engine === "insights"
+            t.engine === "insights" || t.engine === "meta"
               ? (t.narrative as string)
               : summarizeResultForHistory(t.result as QueryResult),
         }));
@@ -124,6 +125,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         computeStatsSummary: async () =>
           formatDatasetSummaryForPrompt(await computeDatasetSummary(csvData, runQuery)),
         narrate: (q, statsSummary) => generateInsight(q, statsSummary, provider),
+        buildMetaAnswer: () => buildMetaAnswer(csvData),
       });
 
       for await (const update of generator) {

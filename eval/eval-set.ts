@@ -1,6 +1,6 @@
 // Phase 18 (updated in Phase 22 for the insights engine) — automated version
 // of what was previously eval-set.md's manual checklist. Hits the real
-// /api/generate-query endpoint (a live LLM call) for 20 questions and checks
+// /api/generate-query endpoint (a live LLM call) for 24 questions and checks
 // STRUCTURAL expectations: right engine, non-empty/validator-passing code
 // (sql/python) or a clean insights routing decision, no crash, destructive
 // queries actually get blocked. It does not execute the SQL/Python, call
@@ -76,8 +76,9 @@ async function callApi(question: string, history?: HistoryTurn[]): Promise<ApiRe
 interface EvalCase {
   id: number;
   question: string;
-  expectEngine?: "sql" | "python" | "insights";
+  expectEngine?: "sql" | "python" | "insights" | "meta";
   expectRejected?: boolean;
+  expectOffTopic?: boolean;
   codeMatches?: RegExp;
 }
 
@@ -105,6 +106,12 @@ const CASES: EvalCase[] = [
   // The "don't over-route broad-sounding questions to insights" check — this
   // one has a specific computable answer (a GROUP BY), so it must stay SQL.
   { id: 20, question: "how does revenue vary by region", expectEngine: "sql", codeMatches: /group by/i },
+  { id: 21, question: "what columns does this dataset have", expectEngine: "meta" },
+  { id: 22, question: "what can I ask you", expectEngine: "meta" },
+  // Off-topic must be distinguished from "on-topic but unanswerable" (case 15) —
+  // this is the check that the two decline codes don't collapse into one.
+  { id: 23, question: "write me a short poem about clouds", expectOffTopic: true },
+  { id: 24, question: "what's the capital of France", expectOffTopic: true },
 ];
 
 beforeAll(async () => {
@@ -123,8 +130,24 @@ describe("Phase 18 eval set — live LLM query generation", () => {
     const { status, body } = await callApi(c.question);
     expect(status, `HTTP ${status}: ${JSON.stringify(body)}`).toBeLessThan(500);
 
+    if (c.expectOffTopic) {
+      expect(body.error, `expected an off-topic decline, got engine=${body.engine}`).toBeTruthy();
+      // The whole point of splitting OFF_TOPIC from NO_QUERY_POSSIBLE is that they
+      // read differently to the person asking — check the actual message, not just
+      // "some error came back" (which the on-topic-rejected case already covers).
+      expect(
+        body.error,
+        `expected the off-topic wording, got: ${body.error}`
+      ).toMatch(/only answer questions about your uploaded dataset/i);
+      return;
+    }
+
     if (c.expectRejected) {
       expect(body.error, `expected NO_QUERY_POSSIBLE, got engine=${body.engine}`).toBeTruthy();
+      expect(
+        body.error,
+        `expected the on-topic-but-unanswerable wording, got: ${body.error}`
+      ).not.toMatch(/only answer questions about your uploaded dataset/i);
       if (body.engine === "sql" && body.code) {
         expect(validateSql(body.code, csv).valid, "a destructive query slipped through").toBe(false);
       }
@@ -132,7 +155,7 @@ describe("Phase 18 eval set — live LLM query generation", () => {
     }
 
     expect(body.error, `unexpectedly rejected: ${body.error}`).toBeFalsy();
-    if (c.expectEngine !== "insights") {
+    if (c.expectEngine !== "insights" && c.expectEngine !== "meta") {
       expect(body.code?.trim(), "model returned empty code").toBeTruthy();
     }
 

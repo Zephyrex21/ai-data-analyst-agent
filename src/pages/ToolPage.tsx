@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useCsvData } from "../hooks/useCsvData";
 import { useDuckDb } from "../hooks/useDuckDb";
 import { useAskQuestion } from "../hooks/useAskQuestion";
+import { useDevMode } from "../hooks/useDevMode";
 import { FileUpload } from "../components/FileUpload";
 import { DataTable } from "../components/DataTable";
 import { AskBar } from "../components/AskBar";
 import { ProviderSelector } from "../components/ProviderSelector";
+import { DevModeToggle } from "../components/DevModeToggle";
 import { AnswerCard } from "../components/AnswerCard";
 import { SampleQuestions } from "../components/SampleQuestions";
 import { Navbar } from "../components/Navbar";
@@ -19,6 +21,7 @@ export function ToolPage() {
   const csv = useCsvData();
   const duckDb = useDuckDb();
   const ask = useAskQuestion(csv.data, uploadedFile);
+  const devMode = useDevMode();
 
   function handleNavigate(id: string) {
     if (id === "top") {
@@ -94,6 +97,7 @@ export function ToolPage() {
 
         {csv.data && (
           <div className="flex items-center justify-end gap-2">
+            <DevModeToggle devMode={devMode.devMode} onChange={devMode.setDevMode} />
             <span className="text-xs text-[var(--color-text-muted)]">Model:</span>
             <ProviderSelector value={ask.provider} onChange={ask.setProvider} disabled={isBusy} />
           </div>
@@ -117,7 +121,7 @@ export function ToolPage() {
           .map((turn, i) => ({ turn, number: i + 1 }))
           .reverse()
           .map(({ turn, number }) => (
-            <AnswerCard key={turn.id} turn={turn} number={number} />
+            <AnswerCard key={turn.id} turn={turn} number={number} devMode={devMode.devMode} />
           ))}
       </div>
 

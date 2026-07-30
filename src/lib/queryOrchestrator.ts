@@ -40,6 +40,8 @@ export interface OrchestratorDeps {
   computeStatsSummary: () => Promise<string>;
   /** Narrates a question against an already-computed stats summary — never invents numbers. */
   narrate: (question: string, statsSummary: string) => Promise<string>;
+  /** Purely local/synchronous — no network call, no model, just templated real schema facts. */
+  buildMetaAnswer: () => string;
 }
 
 // 1 initial attempt + 2 self-correction retries, per the build blueprint.
@@ -83,6 +85,13 @@ export async function* runQueryWithRetries(
     }
 
     yield { stage: "validating", sql: code, engine };
+
+    if (engine === "meta") {
+      // Fully synchronous and local — nothing to await, nothing that can fail.
+      const narrative = deps.buildMetaAnswer();
+      yield { stage: "done", narrative, attemptsUsed: attempt };
+      return;
+    }
 
     if (engine === "insights") {
       yield { stage: "computing-stats", engine };

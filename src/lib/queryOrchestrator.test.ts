@@ -29,6 +29,7 @@ function baseDeps(overrides: Partial<OrchestratorDeps> = {}): OrchestratorDeps {
     loadDataFrame: vi.fn(async () => {}),
     computeStatsSummary: vi.fn(async () => "Total rows: 0"),
     narrate: vi.fn(async () => "Nothing notable stands out."),
+    buildMetaAnswer: vi.fn(() => "This dataset has 0 rows and 0 columns."),
     ...overrides,
   };
 }
@@ -165,6 +166,37 @@ describe("runQueryWithRetries — conversation history is passed through", () =>
     await collect(runQueryWithRetries("follow-up", csv, history, deps));
 
     expect(generateQuery).toHaveBeenCalledWith("follow-up", expect.any(String), null, history);
+  });
+});
+
+describe("runQueryWithRetries — meta routing", () => {
+  it("answers instantly from buildMetaAnswer, with no network/execution calls at all", async () => {
+    const generateQuery = vi.fn(async () => ({ engine: "meta" as const, code: "" }));
+    const buildMetaAnswer = vi.fn(() => "This dataset has 100 rows and 3 columns: a, b, c.");
+    const runSql = vi.fn();
+    const runPython = vi.fn();
+    const narrate = vi.fn();
+    const computeStatsSummary = vi.fn();
+    const deps = baseDeps({
+      generateQuery,
+      buildMetaAnswer,
+      runSql,
+      runPython,
+      narrate,
+      computeStatsSummary,
+    });
+
+    const updates = await collect(runQueryWithRetries("what columns does this have", csv, [], deps));
+
+    expect(buildMetaAnswer).toHaveBeenCalledTimes(1);
+    expect(runSql).not.toHaveBeenCalled();
+    expect(runPython).not.toHaveBeenCalled();
+    expect(narrate).not.toHaveBeenCalled();
+    expect(computeStatsSummary).not.toHaveBeenCalled();
+
+    const last = updates[updates.length - 1];
+    expect(last.stage).toBe("done");
+    expect(last.narrative).toBe("This dataset has 100 rows and 3 columns: a, b, c.");
   });
 });
 

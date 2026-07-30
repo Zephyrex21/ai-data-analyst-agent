@@ -1,6 +1,6 @@
 export class LlmError extends Error {}
 
-export type Engine = "sql" | "python" | "insights";
+export type Engine = "sql" | "python" | "insights" | "meta";
 
 export interface PreviousAttempt {
   engine: Engine;
@@ -72,11 +72,11 @@ export async function generateQuery(
   if (!res.ok || data.error) {
     throw new LlmError(data.error ?? `Request failed (${res.status}).`);
   }
-  if (data.engine !== "sql" && data.engine !== "python" && data.engine !== "insights") {
+  if (data.engine !== "sql" && data.engine !== "python" && data.engine !== "insights" && data.engine !== "meta") {
     throw new LlmError(`Server returned an unrecognized engine: ${data.engine}.`);
   }
-  // Only sql/python need actual code — insights runs no code at all.
-  if (data.engine !== "insights" && !data.code) {
+  // Only sql/python need actual code — insights and meta run no code at all.
+  if (data.engine !== "insights" && data.engine !== "meta" && !data.code) {
     throw new LlmError("Server didn't return any code.");
   }
   return { engine: data.engine, code: data.code ?? "" };

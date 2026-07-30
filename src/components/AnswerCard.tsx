@@ -16,6 +16,7 @@ const ResultChart = lazy(() =>
 interface AnswerCardProps {
   turn: ConversationTurn;
   number: number;
+  devMode?: boolean;
 }
 
 const STAGE_LABELS: Record<AskStage, string> = {
@@ -32,16 +33,18 @@ const ENGINE_BADGE_STYLES: Record<Engine, string> = {
   sql: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
   python: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
   insights: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+  meta: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
 const ENGINE_LABELS: Record<Engine, string> = {
   sql: "SQL",
   python: "Python",
   insights: "Insights",
+  meta: "Info",
 };
 
-export function AnswerCard({ turn, number }: AnswerCardProps) {
-  const { stage, question, engine, provider, result, narrative, statsSummary, error, attemptsUsed } = turn;
+export function AnswerCard({ turn, number, devMode = false }: AnswerCardProps) {
+  const { stage, question, sql, engine, provider, result, narrative, statsSummary, error, attemptsUsed } = turn;
 
   const isBusy =
     stage === "generating-sql" ||
@@ -124,6 +127,17 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
               </details>
             )}
           </div>
+        )}
+
+        {devMode && sql && (
+          <details className="mb-4 group">
+            <summary className="text-xs text-[var(--color-text-muted)] cursor-pointer hover:text-[var(--color-text)] select-none">
+              Show code ({engine === "python" ? "Python" : "SQL"})
+            </summary>
+            <pre className="mt-2 clay-inset p-3 text-xs text-[var(--color-text)] whitespace-pre-wrap font-mono overflow-x-auto">
+              {sql}
+            </pre>
+          </details>
         )}
 
         {result && showBigNumber && (
