@@ -2,7 +2,7 @@
 
 This used to be a manual 18-question checklist you'd run by hand after any
 prompt change. It's now a real script: **`eval/eval-set.ts`**, run with
-**`npm run eval`**. The 18 questions and their expected engine/shape live
+**`npm run eval`**. The 20 questions and their expected engine/shape live
 there now as data, not prose — this file is just the "how and why."
 
 ## Run it
@@ -18,7 +18,7 @@ Against a deployed URL instead of local:
 EVAL_BASE_URL=https://your-app.vercel.app npm run eval
 ```
 
-Runs against Groq by default; to check the same 18 cases against Gemini instead:
+Runs against Groq by default; to check the same 20 cases against Gemini instead:
 
 ```bash
 EVAL_PROVIDER=gemini npm run eval
@@ -48,5 +48,5 @@ one does, on every single run, against a shared free-tier Groq key — so it:
   failing the build on an unrelated PR is worse than not gating on it
 
 Run it manually after touching `SYSTEM_PROMPT` in `api/generate-query.ts`.
-Pass bar: all 18 cases green in one run, without needing more retries than
+Pass bar: all 20 cases green in one run, without needing more retries than
 the app's own built-in 3-attempt self-correction already allows.

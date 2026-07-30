@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
 import type { ParsedCsv } from "../lib/csv";
 import { summarizeResultForHistory } from "../lib/schema";
-import { generateQuery, type Engine, type HistoryTurn } from "../lib/llm";
+import { generateQuery, generateInsight, type Engine, type HistoryTurn } from "../lib/llm";
 import { runQuery, type QueryResult } from "../lib/duckdb";
+import { computeDatasetSummary, formatDatasetSummaryForPrompt } from "../lib/datasetSummary";
 import {
   loadCsvIntoDataframe,
   runPythonCode,
@@ -47,6 +48,8 @@ export interface ConversationTurn {
   engine: Engine | null;
   provider: ProviderId;
   result: QueryResult | null;
+  narrative: string | null;
+  statsSummary: string | null;
   error: string | null;
   attemptsUsed: number;
 }
@@ -91,18 +94,23 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         engine: null,
         provider,
         result: null,
+        narrative: null,
+        statsSummary: null,
         error: null,
         attemptsUsed: 0,
       };
 
       const history: HistoryTurn[] = turns
-        .filter((t) => t.stage === "done" && t.engine && t.sql && t.result)
+        .filter((t) => t.stage === "done" && t.engine && (t.result || t.narrative))
         .slice(-MAX_HISTORY_TURNS)
         .map((t) => ({
           question: t.question,
           engine: t.engine as Engine,
-          code: t.sql as string,
-          resultSummary: summarizeResultForHistory(t.result as QueryResult),
+          code: t.sql ?? "",
+          resultSummary:
+            t.engine === "insights"
+              ? (t.narrative as string)
+              : summarizeResultForHistory(t.result as QueryResult),
         }));
 
       setTurns((prev) => [...prev, newTurn]);
@@ -113,6 +121,9 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         runPython: runPythonCode,
         isDataFrameLoaded: () => isDataFrameLoaded(file),
         loadDataFrame: () => loadCsvIntoDataframe(file),
+        computeStatsSummary: async () =>
+          formatDatasetSummaryForPrompt(await computeDatasetSummary(csvData, runQuery)),
+        narrate: (q, statsSummary) => generateInsight(q, statsSummary, provider),
       });
 
       for await (const update of generator) {

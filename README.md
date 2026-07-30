@@ -1,7 +1,7 @@
 # AI Data Analyst Agent
 
 [![CI](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-83%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-90%20passing-brightgreen)
 ![zero server cost](https://img.shields.io/badge/server%20cost-%240-blue)
 
 > Badge repo path assumes `Zephyrex21/ai-data-analyst-agent` — update if the actual GitHub repo name differs.
@@ -14,7 +14,7 @@ Upload a CSV, ask questions about it in plain English, get a real, verified, exe
 
 Most "AI + your data" demos are LLM chat wrappers: the model reads a sample of your rows and generates plausible-sounding prose. It's confident, and it's frequently wrong — there's no execution, no verification, nothing stopping it from inventing a number that looks right.
 
-This project takes a different approach: the LLM never answers directly. It writes **SQL or Python**, that code gets **validated** against the real schema and a safety layer, then it's **actually executed** against the real data, and the real result is what gets shown. If the code is unsafe, hallucinates a column, or fails to run, the system **retries with the error fed back to the model** — up to 3 attempts — before giving up honestly. Every answer has a "show the code" option, and a small badge showing whether SQL or Python answered it.
+This project takes a different approach: the LLM never gets to just answer directly. For anything computable, it writes **SQL or Python**, that code gets **validated** against the real schema and a safety layer, then it's **actually executed** against the real data, and the real result is what gets shown. If the code is unsafe, hallucinates a column, or fails to run, the system **retries with the error fed back to the model** — up to 3 attempts — before giving up honestly. For genuinely open-ended questions ("summarize this dataset," "what stands out") there's a third path: an **insights engine** that runs a fixed battery of real DuckDB stat queries first, then has the model narrate *only* those real numbers — it's structurally unable to invent a figure, same guarantee as the other two engines, just phrased in prose instead of a chart. Every answer shows a badge for which engine and which model provider produced it.
 
 ## Architecture
 
@@ -25,19 +25,24 @@ flowchart TD
 
     Q["Question<br/>(plain English)"] --> E["Edge Function<br/>/api/generate-query"]
     E --> G["Groq or Gemini<br/>(user-selected)"]
-    G -->|"SQL or Python + engine choice"| V{"Validator"}
+    G -->|"SQL, Python, or insights"| V{"Validator"}
 
     V -->|"SQL"| D
     V -->|"Python"| PY["Pyodide + pandas<br/>(Web Worker)"]
+    V -->|"insights"| STAT["Real stat queries via DuckDB<br/>(min/max/avg/stddev/top-values)"]
     V -->|"rejected"| R["Retry with error context<br/>(max 3 attempts)"]
     R --> E
+
+    STAT --> NAR["Edge Function<br/>/api/generate-insights"]
+    NAR --> G2["Groq or Gemini<br/>(narrates ONLY the real stats)"]
+    G2 --> NARR["Narrative"]
 
     D --> RES["Result"]
     PY --> RES
     RES --> C["Chart / table / big number"]
 ```
 
-Everything except the LLM call runs **entirely in your browser** — DuckDB-WASM for SQL, Pyodide (in a Web Worker, so it never freezes the UI) for statistical Python. The only server-side code is a small serverless function that proxies whichever model provider is selected, so no API key ever reaches the client.
+Everything except the LLM calls runs **entirely in your browser** — DuckDB-WASM for SQL and for the insights engine's stat queries, Pyodide (in a Web Worker, so it never freezes the UI) for statistical Python. The only server-side code is two small serverless functions that proxy whichever model provider is selected, so no API key ever reaches the client. The insights engine specifically never lets the model invent a number — it only ever narrates figures a real DuckDB query already computed.
 
 ## Screenshots
 
@@ -56,7 +61,7 @@ Everything except the LLM call runs **entirely in your browser** — DuckDB-WASM
 | Groq (`openai/gpt-oss-120b`) + Gemini (`gemini-2.5-flash`), user-selectable | Both have workable free tiers; letting the person pick means one provider's rate limit or an outage doesn't take the whole demo down |
 | Validation layer, not just prompting | An LLM will occasionally write `MAX revenue` instead of `MAX(revenue)`, or invent a `profit_margin` column that doesn't exist. Prompting reduces this; a real validator catches what prompting misses |
 | Self-correction loop | When validation or execution fails, the exact error is fed back to the model for a fix — turns "rejected" into "usually just works" |
-| Vitest + CI | 83 tests, including mocked integration tests of the retry loop itself (not just the validators) and CSV edge cases (BOM, encodings, delimiters, line endings, size caps) — CI runs on every push |
+| Vitest + CI | 90 tests, including mocked integration tests of the retry loop itself (not just the validators) and CSV edge cases (BOM, encodings, delimiters, line endings, size caps) — CI runs on every push |
 
 ## Local development
 
@@ -78,7 +83,7 @@ npm test          # run once
 npm run test:watch
 ```
 
-83 tests: CSV parsing (including edge cases — BOM, non-UTF-8 encodings, delimiters, line endings, size caps), the SQL/Python validators, chart-type selection, conversation-history summarization, a sanity check on the bundled sample dataset, the Groq/Gemini provider abstraction (mocked fetch — no real API calls or keys needed), and integration tests of the generate→validate→execute→retry orchestration loop (mocked LLM/execution, no network needed). CI (`.github/workflows/ci.yml`) runs the full suite plus a production build on every push and pull request to `main`.
+90 tests: CSV parsing (including edge cases — BOM, non-UTF-8 encodings, delimiters, line endings, size caps), the SQL/Python validators, chart-type selection, conversation-history summarization, a sanity check on the bundled sample dataset, the Groq/Gemini provider abstraction (mocked fetch — no real API calls or keys needed), and integration tests of the generate→validate→execute→retry orchestration loop (mocked LLM/execution, no network needed). CI (`.github/workflows/ci.yml`) runs the full suite plus a production build on every push and pull request to `main`.
 
 There's also a separate, non-CI eval suite (`npm run eval`) that hits the real LLM against 18 questions to catch prompt regressions — see `eval-set.md` for why it's deliberately kept out of CI.
 
@@ -89,7 +94,7 @@ Push to GitHub, import the repo in Vercel, then add `GROQ_API_KEY` (and optional
 ## Feature overview
 
 - Drag-and-drop CSV upload with client-side type inference, malformed-row handling, and a one-click bundled sample dataset (1,440 rows, 90 days, 4 regions/products) for zero-setup demos
-- Natural language → SQL (DuckDB-WASM) or Python (Pyodide/pandas), router picks the engine per question
+- Natural language → SQL (DuckDB-WASM), Python (Pyodide/pandas), or a narrated "insights" answer over real precomputed stats — router picks per question
 - Switchable model provider (Groq or Gemini) via a selector — the choice is remembered and shown per-answer
 - Charts auto-selected by result shape (pie/bar/line/big-number), tables always available as ground truth
 - Safety validator: blocks non-SELECT statements, unknown tables/columns, unsafe Python patterns; caps result size

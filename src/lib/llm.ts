@@ -1,6 +1,6 @@
 export class LlmError extends Error {}
 
-export type Engine = "sql" | "python";
+export type Engine = "sql" | "python" | "insights";
 
 export interface PreviousAttempt {
   engine: Engine;
@@ -72,11 +72,59 @@ export async function generateQuery(
   if (!res.ok || data.error) {
     throw new LlmError(data.error ?? `Request failed (${res.status}).`);
   }
-  if (data.engine !== "sql" && data.engine !== "python") {
+  if (data.engine !== "sql" && data.engine !== "python" && data.engine !== "insights") {
     throw new LlmError(`Server returned an unrecognized engine: ${data.engine}.`);
   }
-  if (!data.code) {
+  // Only sql/python need actual code — insights runs no code at all.
+  if (data.engine !== "insights" && !data.code) {
     throw new LlmError("Server didn't return any code.");
   }
-  return { engine: data.engine, code: data.code };
+  return { engine: data.engine, code: data.code ?? "" };
+}
+
+interface GenerateInsightResponse {
+  narrative?: string;
+  error?: string;
+}
+
+export async function generateInsight(
+  question: string,
+  statsSummary: string,
+  provider?: string
+): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch("/api/generate-insights", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, statsSummary, provider }),
+    });
+  } catch {
+    throw new LlmError(
+      "Couldn't reach the server. If you're running locally, make sure you started this with `vercel dev`, not `npm run dev` — plain Vite doesn't run the /api function."
+    );
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new LlmError(
+      "Got a non-JSON response from /api/generate-insights — the API route isn't actually running. " +
+        "Make sure you started this with `vercel dev`, not `npm run dev`."
+    );
+  }
+
+  let data: GenerateInsightResponse;
+  try {
+    data = await res.json();
+  } catch {
+    throw new LlmError("Server returned a response that claimed to be JSON but wasn't.");
+  }
+
+  if (!res.ok || data.error) {
+    throw new LlmError(data.error ?? `Request failed (${res.status}).`);
+  }
+  if (!data.narrative) {
+    throw new LlmError("Server didn't return a narrative.");
+  }
+  return data.narrative;
 }

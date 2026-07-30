@@ -124,7 +124,7 @@ function serializeRow(
   return out;
 }
 
-// Basic identifier quoting so table names with odd characters don't break the query.
-function quoteIdent(ident: string): string {
+// Basic identifier quoting so table/column names with odd characters don't break a query.
+export function quoteIdent(ident: string): string {
   return `"${ident.replace(/"/g, '""')}"`;
 }

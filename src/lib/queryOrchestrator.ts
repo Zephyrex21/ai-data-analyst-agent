@@ -9,6 +9,7 @@ export type OrchestratorStage =
   | "generating-sql"
   | "validating"
   | "loading-python"
+  | "computing-stats"
   | "running-query"
   | "done"
   | "error";
@@ -18,6 +19,8 @@ export interface OrchestratorUpdate {
   sql?: string;
   engine?: Engine;
   result?: QueryResult;
+  narrative?: string;
+  statsSummary?: string;
   error?: string;
   attemptsUsed?: number;
 }
@@ -33,6 +36,10 @@ export interface OrchestratorDeps {
   runPython: (code: string) => Promise<QueryResult>;
   isDataFrameLoaded: () => boolean;
   loadDataFrame: () => Promise<void>;
+  /** Runs the fixed battery of real DuckDB stat queries and formats them for the narration prompt. */
+  computeStatsSummary: () => Promise<string>;
+  /** Narrates a question against an already-computed stats summary — never invents numbers. */
+  narrate: (question: string, statsSummary: string) => Promise<string>;
 }
 
 // 1 initial attempt + 2 self-correction retries, per the build blueprint.
@@ -76,6 +83,38 @@ export async function* runQueryWithRetries(
     }
 
     yield { stage: "validating", sql: code, engine };
+
+    if (engine === "insights") {
+      yield { stage: "computing-stats", engine };
+      let statsSummary: string;
+      try {
+        statsSummary = await deps.computeStatsSummary();
+      } catch (err) {
+        yield {
+          stage: "error",
+          error: `Couldn't compute dataset statistics: ${err instanceof Error ? err.message : String(err)}`,
+        };
+        return;
+      }
+
+      yield { stage: "running-query" };
+      try {
+        const narrative = await deps.narrate(question, statsSummary);
+        yield { stage: "done", narrative, statsSummary, attemptsUsed: attempt };
+        return;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Narration failed.";
+        if (attempt < MAX_ATTEMPTS) {
+          previousAttempt = { engine, code: "", error: message };
+          continue;
+        }
+        yield {
+          stage: "error",
+          error: `Couldn't generate an insight after ${MAX_ATTEMPTS} attempts. Last error: ${message}`,
+        };
+        return;
+      }
+    }
 
     if (engine === "sql") {
       const validation = validateSql(code, csvData);

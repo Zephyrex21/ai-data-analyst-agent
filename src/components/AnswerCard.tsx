@@ -22,6 +22,7 @@ const STAGE_LABELS: Record<AskStage, string> = {
   "generating-sql": "Thinking about how to answer this…",
   validating: "Checking the code is safe to run…",
   "loading-python": "Starting the Python engine (first time only, ~10-20s)…",
+  "computing-stats": "Computing real statistics about your data…",
   "running-query": "Running it…",
   done: "",
   error: "",
@@ -30,15 +31,23 @@ const STAGE_LABELS: Record<AskStage, string> = {
 const ENGINE_BADGE_STYLES: Record<Engine, string> = {
   sql: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
   python: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  insights: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+};
+
+const ENGINE_LABELS: Record<Engine, string> = {
+  sql: "SQL",
+  python: "Python",
+  insights: "Insights",
 };
 
 export function AnswerCard({ turn, number }: AnswerCardProps) {
-  const { stage, question, engine, provider, result, error, attemptsUsed } = turn;
+  const { stage, question, engine, provider, result, narrative, statsSummary, error, attemptsUsed } = turn;
 
   const isBusy =
     stage === "generating-sql" ||
     stage === "validating" ||
     stage === "loading-python" ||
+    stage === "computing-stats" ||
     stage === "running-query";
   const chartSpec = result ? chooseChartType(result) : null;
   const showBigNumber = result ? isSingleScalar(result) : false;
@@ -63,7 +72,7 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
             <span
               className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${ENGINE_BADGE_STYLES[engine]}`}
             >
-              {engine === "sql" ? "SQL" : "Python"}
+              {ENGINE_LABELS[engine]}
             </span>
           )}
           {engine && (
@@ -98,6 +107,22 @@ export function AnswerCard({ turn, number }: AnswerCardProps) {
         {error && (
           <div className="rounded-2xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
+          </div>
+        )}
+
+        {narrative && (
+          <div className="mb-4">
+            <p className="text-[var(--color-text)] leading-relaxed">{narrative}</p>
+            {statsSummary && (
+              <details className="mt-3 group">
+                <summary className="text-xs text-[var(--color-text-muted)] cursor-pointer hover:text-[var(--color-text)] select-none">
+                  Show the real numbers behind this
+                </summary>
+                <pre className="mt-2 clay-inset p-3 text-xs text-[var(--color-text-muted)] whitespace-pre-wrap font-mono">
+                  {statsSummary}
+                </pre>
+              </details>
+            )}
           </div>
         )}
 

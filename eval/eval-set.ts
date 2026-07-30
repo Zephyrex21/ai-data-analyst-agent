@@ -1,11 +1,13 @@
-// Phase 18 — automated version of what was previously eval-set.md's manual
-// checklist. Hits the real /api/generate-query endpoint (a live LLM call)
-// for all 18 questions and checks STRUCTURAL expectations: right engine,
-// non-empty/validator-passing code, no crash, destructive queries actually
-// get blocked. It does not execute the SQL/Python or check exact numbers —
-// that would need a full DuckDB/Pyodide runtime, which is what Phases 1-15
-// already cover with real browser testing. This is a regression net for the
-// PROMPT, not the execution engines.
+// Phase 18 (updated in Phase 22 for the insights engine) — automated version
+// of what was previously eval-set.md's manual checklist. Hits the real
+// /api/generate-query endpoint (a live LLM call) for 20 questions and checks
+// STRUCTURAL expectations: right engine, non-empty/validator-passing code
+// (sql/python) or a clean insights routing decision, no crash, destructive
+// queries actually get blocked. It does not execute the SQL/Python, call
+// /api/generate-insights, or check exact numbers — that would need a full
+// DuckDB/Pyodide runtime plus a second live LLM call, which is what the
+// browser-based testing in earlier phases covers. This is a regression net
+// for the ROUTING PROMPT specifically, not the execution engines.
 //
 // Why this isn't in `npm test` / CI: every run spends real Groq API budget
 // against the shared free-tier key, needs a live server (`vercel dev` or a
@@ -74,7 +76,7 @@ async function callApi(question: string, history?: HistoryTurn[]): Promise<ApiRe
 interface EvalCase {
   id: number;
   question: string;
-  expectEngine?: "sql" | "python";
+  expectEngine?: "sql" | "python" | "insights";
   expectRejected?: boolean;
   codeMatches?: RegExp;
 }
@@ -99,6 +101,10 @@ const CASES: EvalCase[] = [
   { id: 15, question: "what's the profit margin", expectRejected: true },
   { id: 17, question: "how many distinct products are there", expectEngine: "sql", codeMatches: /distinct/i },
   { id: 18, question: "which days had no widget in stock", expectEngine: "sql", codeMatches: /in_stock/i },
+  { id: 19, question: "give me an overview of this dataset", expectEngine: "insights" },
+  // The "don't over-route broad-sounding questions to insights" check — this
+  // one has a specific computable answer (a GROUP BY), so it must stay SQL.
+  { id: 20, question: "how does revenue vary by region", expectEngine: "sql", codeMatches: /group by/i },
 ];
 
 beforeAll(async () => {
@@ -126,7 +132,9 @@ describe("Phase 18 eval set — live LLM query generation", () => {
     }
 
     expect(body.error, `unexpectedly rejected: ${body.error}`).toBeFalsy();
-    expect(body.code?.trim(), "model returned empty code").toBeTruthy();
+    if (c.expectEngine !== "insights") {
+      expect(body.code?.trim(), "model returned empty code").toBeTruthy();
+    }
 
     if (c.expectEngine) {
       expect(body.engine, `expected engine "${c.expectEngine}", got "${body.engine}"`).toBe(c.expectEngine);

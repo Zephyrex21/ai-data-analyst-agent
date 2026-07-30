@@ -27,6 +27,8 @@ function baseDeps(overrides: Partial<OrchestratorDeps> = {}): OrchestratorDeps {
     runPython: vi.fn(),
     isDataFrameLoaded: () => true,
     loadDataFrame: vi.fn(async () => {}),
+    computeStatsSummary: vi.fn(async () => "Total rows: 0"),
+    narrate: vi.fn(async () => "Nothing notable stands out."),
     ...overrides,
   };
 }
@@ -163,5 +165,62 @@ describe("runQueryWithRetries — conversation history is passed through", () =>
     await collect(runQueryWithRetries("follow-up", csv, history, deps));
 
     expect(generateQuery).toHaveBeenCalledWith("follow-up", expect.any(String), null, history);
+  });
+});
+
+describe("runQueryWithRetries — insights routing", () => {
+  it("computes real stats first, then narrates over them, without touching SQL/Python execution", async () => {
+    const generateQuery = vi.fn(async () => ({ engine: "insights" as const, code: "" }));
+    const computeStatsSummary = vi.fn(async () => "Total rows: 4\n- revenue (number): min=10, max=90");
+    const narrate = vi.fn(async () => "Revenue ranges from 10 to 90 across 4 rows.");
+    const runSql = vi.fn();
+    const runPython = vi.fn();
+    const deps = baseDeps({ generateQuery, computeStatsSummary, narrate, runSql, runPython });
+
+    const updates = await collect(runQueryWithRetries("give me an overview", csv, [], deps));
+
+    expect(computeStatsSummary).toHaveBeenCalledTimes(1);
+    expect(narrate).toHaveBeenCalledWith(
+      "give me an overview",
+      "Total rows: 4\n- revenue (number): min=10, max=90"
+    );
+    expect(runSql).not.toHaveBeenCalled();
+    expect(runPython).not.toHaveBeenCalled();
+
+    const last = updates[updates.length - 1];
+    expect(last.stage).toBe("done");
+    expect(last.narrative).toBe("Revenue ranges from 10 to 90 across 4 rows.");
+    expect(last.statsSummary).toContain("Total rows: 4");
+    expect(updates.some((u) => u.stage === "computing-stats")).toBe(true);
+  });
+
+  it("retries narration on failure and eventually reports a clean error", async () => {
+    const generateQuery = vi.fn(async () => ({ engine: "insights" as const, code: "" }));
+    const narrate = vi.fn().mockRejectedValue(new Error("model unavailable"));
+    const deps = baseDeps({ generateQuery, narrate });
+
+    const updates = await collect(runQueryWithRetries("summarize this", csv, [], deps));
+
+    expect(narrate).toHaveBeenCalledTimes(MAX_ATTEMPTS);
+    const last = updates[updates.length - 1];
+    expect(last.stage).toBe("error");
+    expect(last.error).toContain(String(MAX_ATTEMPTS));
+  });
+
+  it("fails immediately (no retry) when computing stats itself throws", async () => {
+    const generateQuery = vi.fn(async () => ({ engine: "insights" as const, code: "" }));
+    const computeStatsSummary = vi.fn().mockRejectedValue(new Error("DuckDB not ready"));
+    const narrate = vi.fn();
+    const deps = baseDeps({ generateQuery, computeStatsSummary, narrate });
+
+    const updates = await collect(runQueryWithRetries("summarize this", csv, [], deps));
+
+    // A DuckDB/infrastructure failure isn't something the LLM can fix by
+    // trying again — same "don't retry what retrying won't fix" principle
+    // as the top-level LLM-call failure case above.
+    expect(generateQuery).toHaveBeenCalledTimes(1);
+    expect(narrate).not.toHaveBeenCalled();
+    const last = updates[updates.length - 1];
+    expect(last.stage).toBe("error");
   });
 });

@@ -1,8 +1,9 @@
 import { PROVIDERS, DEFAULT_PROVIDER, isProviderId, ProviderError, type ProviderId } from "./providers";
+import { jsonResponse, log, parseModelJson } from "./_lib/util";
 
 export const config = { runtime: "edge" };
 
-type Engine = "sql" | "python";
+type Engine = "sql" | "python" | "insights";
 
 interface PreviousAttempt {
   engine?: Engine;
@@ -26,7 +27,8 @@ interface RequestBody {
 }
 
 const SYSTEM_PROMPT = `You are a data analysis assistant. Given a table schema and a question in plain English,
-decide whether to answer it with SQL (DuckDB) or Python (pandas), then write ONLY the code for that engine.
+decide how to answer it: SQL (DuckDB), Python (pandas), or "insights" (a narrated summary — see below),
+then write ONLY the code for that engine (insights needs no code).
 
 ENGINE CHOICE — prefer SQL for almost everything: counts, sums, averages, filtering, grouping, sorting,
 min/max, simple correlations (DuckDB has a built-in corr(x, y) function). Only choose Python when the
@@ -34,12 +36,21 @@ question needs something SQL genuinely struggles with here: a correlation matrix
 at once, z-score/statistical outlier detection, simple linear regression coefficients, rolling/moving
 averages, or similar multi-step statistical work. When in doubt, choose SQL.
 
+Choose "insights" ONLY when the question is genuinely open-ended with no single computable answer —
+a general overview, "summarize this dataset", "what stands out", "anything interesting here", or similar.
+This does not run any code — the answer instead gets narrated from separately precomputed real dataset
+statistics. If the question CAN be answered with a specific SQL or Python query, always prefer that over
+"insights", even if the question sounds broad on the surface (e.g. "how does revenue vary by region" is
+still a GROUP BY, not insights).
+
 Respond with ONLY a single JSON object, no markdown fences, no explanation outside the JSON, in exactly
 this shape:
 {"engine": "sql", "code": "..."}
 or
 {"engine": "python", "code": "..."}
-or, if the question genuinely cannot be answered with either engine given the schema:
+or
+{"engine": "insights"}
+or, if the question genuinely cannot be answered by any of the above given the schema:
 {"error": "NO_QUERY_POSSIBLE"}
 
 Rules when engine is "sql" (DuckDB):
@@ -72,7 +83,7 @@ Rules when engine is "python" (pandas):
   When genuinely unsure whether grouping is warranted, prefer grouping by the most relevant categorical
   column over pooling — a scoped, correct answer beats a technically-computed but misleading one.
 
-Both engines — this rule applies either way:
+All engines — these rules apply regardless of which one is chosen:
 - If a question asks for a metric that isn't directly derivable from the given columns (e.g. "profit margin"
   when there's no cost/profit column), do NOT invent a formula using unrelated columns to fake a placeholder
   number. In that case respond with {"error": "NO_QUERY_POSSIBLE"}.
@@ -87,10 +98,10 @@ Both engines — this rule applies either way:
 
 const MAX_HISTORY_TURNS = 5;
 
-// Minimal structured logging so failures show up in Vercel's function logs
-// instead of being silent. Never logs question/schema content (user data).
-function log(event: string, data: Record<string, unknown> = {}): void {
-  console.log(JSON.stringify({ event, ts: new Date().toISOString(), ...data }));
+interface ParsedModelResponse {
+  engine?: string;
+  code?: string;
+  error?: string;
 }
 
 export default async function handler(req: Request): Promise<Response> {
@@ -154,7 +165,7 @@ export default async function handler(req: Request): Promise<Response> {
   try {
     const raw = await providerConfig.call(apiKey, SYSTEM_PROMPT, userPrompt);
 
-    const parsed = parseModelJson(raw);
+    const parsed = parseModelJson<ParsedModelResponse>(raw);
     if (!parsed) {
       return jsonResponse(
         { error: "Model response wasn't valid JSON and couldn't be parsed." },
@@ -167,6 +178,10 @@ export default async function handler(req: Request): Promise<Response> {
         { error: "That question doesn't seem answerable from this dataset's columns." },
         200
       );
+    }
+
+    if (parsed.engine === "insights") {
+      return jsonResponse({ engine: "insights", provider }, 200);
     }
 
     if (parsed.engine !== "sql" && parsed.engine !== "python") {
@@ -195,44 +210,10 @@ export default async function handler(req: Request): Promise<Response> {
   }
 }
 
-interface ParsedModelResponse {
-  engine?: string;
-  code?: string;
-  error?: string;
-}
-
-function parseModelJson(raw: string): ParsedModelResponse | null {
-  const attempts = [raw.trim()];
-
-  // In case the model adds markdown fences despite instructions.
-  const fenceStripped = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-  if (fenceStripped !== attempts[0]) attempts.push(fenceStripped);
-
-  // Fallback: grab the first {...} block in case of stray text around it.
-  const braceMatch = raw.match(/\{[\s\S]*\}/);
-  if (braceMatch) attempts.push(braceMatch[0]);
-
-  for (const candidate of attempts) {
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
-
 function cleanSql(raw: string): string {
   let sql = raw.trim();
   sql = sql.replace(/^```(?:sql)?\s*/i, "").replace(/```\s*$/i, "");
   sql = sql.trim();
   sql = sql.replace(/;\s*$/, "");
   return sql;
-}
-
-function jsonResponse(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
 }
