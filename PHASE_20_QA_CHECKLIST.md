@@ -50,6 +50,8 @@ worth a real pass through:
 - [ ] Trigger the Phase 16 cooldown and confirm **both** the Ask bar and the sample-question chips now show it consistently
 - [ ] Upload a non-UTF-8 file (Phase 17) and confirm the encoding warning actually renders and is legible in both themes
 - [ ] Confirm the CI badge and eval-set links in the README actually resolve once pushed to the real GitHub repo
+- [ ] **Phase 25** — time the first Python-routed question with a fresh upload; confirm it's noticeably faster than the old ~10-20s now that warm-up starts right after upload. Also confirm a fast follow-up Python question right after upload (while warm-up might still be in flight) doesn't double-load or error.
+- [ ] **Phase 26** — this is the important one: the batched insights query (multiple `MIN`/`MAX`/`AVG`/`STDDEV`/`COUNT(*) FILTER`/`corr()` expressions in one `SELECT`, plus the per-category `GROUP BY` queries) has only ever been unit-tested against a **mocked** `runSql` — never executed against real DuckDB-WASM. Ask an insights question for real and confirm it doesn't throw a SQL syntax error; check Dev Mode isn't relevant here since insights has no code to show, so this needs an actual live insights answer to verify. Also try a question naming a specific column (e.g. "what's typical for revenue") and confirm the scoped-columns note appears correctly.
 
 This phase doesn't fully "complete" until that manual pass comes back
 clean too — the checklist above is what to run it against.

@@ -3,7 +3,11 @@ import type { ParsedCsv } from "../lib/csv";
 import { summarizeResultForHistory } from "../lib/schema";
 import { generateQuery, generateInsight, type Engine, type HistoryTurn } from "../lib/llm";
 import { runQuery, type QueryResult } from "../lib/duckdb";
-import { computeDatasetSummary, formatDatasetSummaryForPrompt } from "../lib/datasetSummary";
+import {
+  computeDatasetSummary,
+  formatDatasetSummaryForPrompt,
+  findMentionedColumns,
+} from "../lib/datasetSummary";
 import { buildMetaAnswer } from "../lib/metaAnswer";
 import {
   loadCsvIntoDataframe,
@@ -122,8 +126,11 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         runPython: runPythonCode,
         isDataFrameLoaded: () => isDataFrameLoaded(file),
         loadDataFrame: () => loadCsvIntoDataframe(file),
-        computeStatsSummary: async () =>
-          formatDatasetSummaryForPrompt(await computeDatasetSummary(csvData, runQuery)),
+        computeStatsSummary: async () => {
+          const onlyColumns = findMentionedColumns(question, csvData);
+          const summary = await computeDatasetSummary(csvData, runQuery, { onlyColumns });
+          return formatDatasetSummaryForPrompt(summary);
+        },
         narrate: (q, statsSummary) => generateInsight(q, statsSummary, provider),
         buildMetaAnswer: () => buildMetaAnswer(csvData),
       });
