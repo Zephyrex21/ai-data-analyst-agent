@@ -32,10 +32,15 @@ stats — see below), or "meta" (a question about the dataset's structure or thi
 not its data values — see below), then write ONLY the code for that engine (insights and meta need no code).
 
 ENGINE CHOICE — prefer SQL for almost everything: counts, sums, averages, filtering, grouping, sorting,
-min/max, simple correlations (DuckDB has a built-in corr(x, y) function). Only choose Python when the
-question needs something SQL genuinely struggles with here: a correlation matrix across several columns
-at once, z-score/statistical outlier detection, simple linear regression coefficients, rolling/moving
-averages, or similar multi-step statistical work. When in doubt, choose SQL.
+min/max, simple correlations (DuckDB has a built-in corr(x, y) function). SQL also supports window
+functions and a single-level subquery — use this for "top N per group" style questions instead of
+routing to Python, e.g.:
+SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY region ORDER BY revenue DESC) AS rn FROM data) WHERE rn <= 2
+(Multi-statement CTEs — a "WITH ... AS (...)" prefix — are NOT supported; use a subquery instead, as above.)
+Only choose Python when the question needs something SQL genuinely struggles with even with subqueries:
+a correlation matrix across several columns at once, z-score/statistical outlier detection, simple linear
+regression coefficients, rolling/moving averages, or similar multi-step statistical work. When in doubt,
+choose SQL.
 
 Choose "insights" ONLY when the question is genuinely open-ended, asking to analyze or characterize the
 ACTUAL DATA VALUES with no single computable answer — "summarize this dataset", "what stands out",
@@ -81,8 +86,11 @@ Rules when engine is "python" (pandas):
 - A pandas DataFrame called df is already loaded with the CSV data. Do not reload or reassign df.
 - Assign your final answer to a variable named result — a pandas DataFrame, a pandas Series, or a plain
   scalar (number/string). This is required.
-- Only use pandas, numpy, and Python built-ins. Do not import os, sys, subprocess, socket, or any
+- Only use pandas, numpy, scipy, and Python built-ins. Do not import os, sys, subprocess, socket, or any
   file/network module. Do not use open(), eval(), exec(), or __import__().
+- For z-score/outlier detection, prefer scipy.stats.zscore over hand-writing the (x - mean) / std formula
+  yourself. For linear regression, prefer scipy.stats.linregress over deriving coefficients manually.
+  Tested library functions here are less error-prone than reimplementing the same math inline each time.
 - Keep the code short and focused only on answering the question.
 - Before computing an outlier, average, z-score, or similar statistic on a numeric column, check whether
   the schema has a categorical column (like product, region, category, type) that the numeric column's

@@ -17,6 +17,14 @@ const pending = new Map<number, PendingRequest>();
 // worker crash so a stale "already loaded" assumption can't survive a
 // worker being silently replaced underneath it.
 let loadedFile: File | null = null;
+// Tracks an in-flight load so a background warm-up (Phase 25) and a real
+// question arriving moments later don't both trigger their own separate
+// "loadCsv" round trip for the same file — the second caller just awaits
+// the first's promise instead. Keyed by file reference so switching to a
+// genuinely different file while a load is in flight still starts fresh
+// rather than waiting on the wrong file's promise.
+let loadingFile: File | null = null;
+let loadingPromise: Promise<void> | null = null;
 
 /**
  * Lazily creates a single shared Worker running Pyodide off the main thread
@@ -72,18 +80,63 @@ export function isDataFrameLoaded(file: File): boolean {
 /**
  * Loads the CSV's contents into a pandas DataFrame available as `df` in
  * Python. Safe to call before every Python question — it's a no-op if this
- * exact File is already loaded into the current worker.
+ * exact File is already loaded, and if a load for this exact File is
+ * already in flight (e.g. a background warm-up that hasn't finished yet),
+ * this just awaits that same load instead of starting a redundant one.
  */
-export async function loadCsvIntoDataframe(file: File): Promise<void> {
-  if (loadedFile === file) return;
-  const text = await file.text();
-  await sendToWorker("loadCsv", text);
-  loadedFile = file;
+export function loadCsvIntoDataframe(file: File): Promise<void> {
+  if (loadedFile === file) return Promise.resolve();
+  if (loadingFile === file && loadingPromise) return loadingPromise;
+
+  loadingFile = file;
+  loadingPromise = (async () => {
+    const text = await file.text();
+    await sendToWorker("loadCsv", text);
+    loadedFile = file;
+  })().finally(() => {
+    if (loadingFile === file) {
+      loadingFile = null;
+      loadingPromise = null;
+    }
+  });
+  return loadingPromise;
+}
+
+/**
+ * Pure logic, exported separately so it's unit-testable without needing a
+ * real Worker: whether to skip the background Pyodide warm-up because the
+ * browser has signalled the person is on a metered/data-saver connection.
+ * `navigator.connection` is Chromium-only and experimental, so this is a
+ * best-effort check, not a guarantee — absence of the API just means "don't skip."
+ */
+export function shouldSkipBackgroundWarmup(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean } })
+    .connection;
+  return connection?.saveData === true;
+}
+
+/**
+ * Kicks off the Pyodide download + CSV load in the background right after a
+ * successful upload, well before any question is asked — see Phase 25.
+ * Purely an optimization: if it fails for any reason (offline, a CDN
+ * hiccup), the normal lazy-load path above still runs exactly as before the
+ * first time a question actually routes to Python. Errors here are
+ * swallowed on purpose — a background prefetch failing must never surface
+ * to the user as if something actually went wrong.
+ */
+export function warmUpPyodide(file: File): void {
+  if (shouldSkipBackgroundWarmup()) return;
+  loadCsvIntoDataframe(file).catch(() => {
+    // Swallowed — see doc comment above.
+  });
 }
 
 /** Forces the next loadCsvIntoDataframe call to actually reload, e.g. after the app-level reset. */
 export function resetPythonState(): void {
   loadedFile = null;
+  loadingFile = null;
+  loadingPromise = null;
 }
 
 /** Executes model-generated Python code against the already-loaded `df`. */

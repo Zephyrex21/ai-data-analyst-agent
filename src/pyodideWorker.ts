@@ -10,7 +10,11 @@ let pyodide: PyodideAPI | null = null;
 async function ensurePyodide(): Promise<PyodideAPI> {
   if (pyodide) return pyodide;
   pyodide = await loadPyodide({ indexURL: PYODIDE_CDN_INDEX_URL });
-  await pyodide.loadPackage(["pandas"]);
+  // scipy added in Phase 25 so outlier/regression questions can use tested
+  // functions (scipy.stats.zscore, scipy.stats.linregress) instead of the
+  // model hand-rolling that math inline every time — see api/generate-query.ts's
+  // system prompt and Engineering Journal bug #3 for why that matters.
+  await pyodide.loadPackage(["pandas", "scipy"]);
   return pyodide;
 }
 

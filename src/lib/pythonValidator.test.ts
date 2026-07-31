@@ -16,6 +16,18 @@ describe("validatePythonCode — legitimate code passes", () => {
     const code = "grouped = df.groupby('region')['revenue'].sum()\nresult = grouped";
     expect(validatePythonCode(code).valid).toBe(true);
   });
+
+  it("allows scipy (Phase 25) — z-score via scipy.stats instead of hand-rolled math", () => {
+    const code =
+      "from scipy import stats\nresult = df[abs(stats.zscore(df['revenue'])) > 2]";
+    expect(validatePythonCode(code).valid).toBe(true);
+  });
+
+  it("allows scipy.stats.linregress for regression questions", () => {
+    const code =
+      "from scipy import stats\nslope, intercept, r, p, se = stats.linregress(df['units_sold'], df['revenue'])\nresult = slope";
+    expect(validatePythonCode(code).valid).toBe(true);
+  });
 });
 
 describe("validatePythonCode — risky patterns are blocked", () => {

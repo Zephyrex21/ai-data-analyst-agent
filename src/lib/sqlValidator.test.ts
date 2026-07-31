@@ -100,3 +100,51 @@ describe("validateSql — edge cases", () => {
     expect(validateSql("   ", csv).valid).toBe(false);
   });
 });
+
+describe("validateSql — subqueries and window functions (Phase 24)", () => {
+  it("allows a window function directly in a SELECT (no subquery needed)", () => {
+    const r = validateSql(
+      "SELECT region, revenue, ROW_NUMBER() OVER (PARTITION BY region ORDER BY revenue DESC) AS rn FROM data",
+      csv
+    );
+    expect(r.valid).toBe(true);
+  });
+
+  it("allows a single-level subquery filtering on a window function alias — the 'top N per group' pattern", () => {
+    const r = validateSql(
+      "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY region ORDER BY revenue DESC) AS rn FROM data) WHERE rn <= 2",
+      csv
+    );
+    expect(r.valid).toBe(true);
+  });
+
+  it("still catches a hallucinated column even when it's nested inside a subquery", () => {
+    const r = validateSql(
+      "SELECT * FROM (SELECT profit_margin, region FROM data) WHERE profit_margin > 100",
+      csv
+    );
+    expect(r.valid).toBe(false);
+    expect(r.reason).toMatch(/profit_margin/);
+  });
+
+  it("still blocks a destructive keyword even alongside subquery syntax", () => {
+    const r = validateSql(
+      "SELECT * FROM (SELECT * FROM data) AS t; DELETE FROM data",
+      csv
+    );
+    expect(r.valid).toBe(false);
+  });
+
+  it("still rejects true multi-statement CTEs (WITH ... SELECT) — unchanged from before", () => {
+    const r = validateSql("WITH t AS (SELECT * FROM data) SELECT * FROM t", csv);
+    expect(r.valid).toBe(false);
+  });
+
+  it("appends the row-cap LIMIT to a subquery-based query same as any other", () => {
+    const r = validateSql(
+      "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY region ORDER BY revenue DESC) AS rn FROM data) WHERE rn <= 2",
+      csv
+    );
+    expect(r.sql).toMatch(/LIMIT \d+$/);
+  });
+});

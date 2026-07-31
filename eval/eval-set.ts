@@ -1,6 +1,6 @@
 // Phase 18 (updated in Phase 22 for the insights engine) — automated version
 // of what was previously eval-set.md's manual checklist. Hits the real
-// /api/generate-query endpoint (a live LLM call) for 24 questions and checks
+// /api/generate-query endpoint (a live LLM call) for 26 questions and checks
 // STRUCTURAL expectations: right engine, non-empty/validator-passing code
 // (sql/python) or a clean insights routing decision, no crash, destructive
 // queries actually get blocked. It does not execute the SQL/Python, call
@@ -112,6 +112,23 @@ const CASES: EvalCase[] = [
   // this is the check that the two decline codes don't collapse into one.
   { id: 23, question: "write me a short poem about clouds", expectOffTopic: true },
   { id: 24, question: "what's the capital of France", expectOffTopic: true },
+  // Phase 24 — "top N per group" should stay SQL (subquery + window function),
+  // not over-route to Python for something DuckDB handles natively.
+  {
+    id: 25,
+    question: "what are the top 2 products by revenue in each region",
+    expectEngine: "sql",
+    codeMatches: /OVER\s*\(/i,
+  },
+  // Phase 25 — the prompt now steers outlier questions toward scipy.stats
+  // instead of hand-rolled z-score math. Loose match (just "scipy") since
+  // exact function choice can vary; the point is the library gets reached for.
+  {
+    id: 26,
+    question: "are there any statistical outliers in revenue",
+    expectEngine: "python",
+    codeMatches: /scipy/i,
+  },
 ];
 
 beforeAll(async () => {

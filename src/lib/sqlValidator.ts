@@ -56,9 +56,13 @@ export function validateSql(rawSql: string, csv: ParsedCsv): ValidationResult {
 
   const firstToken = stripped.trim().split(/\s+/)[0]?.toUpperCase();
   if (firstToken !== "SELECT") {
-    // CTEs (WITH ...) are deliberately not supported: this app only ever
-    // queries one flat table, so a CTE's temporary name would need special
-    // handling in the table-existence check below for no real benefit here.
+    // Only a literal WITH-prefixed CTE is blocked here — a CTE's temporary
+    // name would need special handling in the table-existence check below
+    // for no real benefit, since the same "top N per group" pattern is
+    // already achievable with a subquery instead (see Phase 24): a subquery
+    // still starts with SELECT, so it reaches this check and passes.
+    // Verified in sqlValidator.test.ts that subqueries + window functions
+    // pass while true CTEs still correctly fail here.
     return fail(
       rawSql,
       `Only plain SELECT queries are allowed — this one started with "${firstToken ?? "?"}".`

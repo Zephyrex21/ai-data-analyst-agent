@@ -4,6 +4,7 @@ import { useCsvData } from "../hooks/useCsvData";
 import { useDuckDb } from "../hooks/useDuckDb";
 import { useAskQuestion } from "../hooks/useAskQuestion";
 import { useDevMode } from "../hooks/useDevMode";
+import { warmUpPyodide } from "../lib/pyodide";
 import { FileUpload } from "../components/FileUpload";
 import { DataTable } from "../components/DataTable";
 import { AskBar } from "../components/AskBar";
@@ -39,6 +40,10 @@ export function ToolPage() {
     csv.loadFile(file);
     duckDb.loadTable(file);
     ask.reset();
+    // Phase 25: start downloading Pyodide + loading this file into pandas
+    // now, in the background, instead of waiting for the first question
+    // that actually routes to Python. Fire-and-forget by design.
+    warmUpPyodide(file);
   }
 
   function handleFileSelected(file: File) {

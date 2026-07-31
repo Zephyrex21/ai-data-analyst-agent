@@ -138,8 +138,44 @@ and the fix, from whoever was there when it happened.)*
 
 ---
 
-**Pattern across all five:** none of these were caught by "it works on my
-machine." #1 needed a second locale. #2 needed a second occurrence to
+## 6. The warm-up race (Phase 25)
+
+**Symptom:** never actually observed in production — caught while writing the
+Python engine's proactive warm-up (start downloading Pyodide right after
+upload, instead of waiting for the first Python question). While designing
+it, tracing through what happens if a real question arrives *while* that
+background warm-up is still in flight surfaced a genuine bug in code that
+had shipped back in the original Pyodide integration and worked fine until
+now, because nothing had ever called it twice concurrently before.
+
+**Root cause:** `loadCsvIntoDataframe` only checked "is this file already
+fully loaded" (`loadedFile === file`) before starting a new load — it had no
+concept of "a load for this file is already *in progress*." Once a
+background warm-up could start a load that takes several seconds, a real
+question arriving during that window would trigger a second, fully
+redundant `loadCsv` round trip to the worker: same file, parsed twice,
+pure wasted work (and, depending on message-processing order, a small risk
+of the two loads finishing in a different order than started).
+
+**Fix:** added an in-flight promise cache in `pyodide.ts`, keyed by file
+reference — a second call for the *same* file while a load is already
+running just awaits the first call's promise instead of starting its own;
+a call for a genuinely *different* file (someone re-uploads mid-warm-up)
+still starts fresh rather than incorrectly waiting on the wrong file.
+
+**Lesson:** this bug didn't exist until a new feature made a previously
+impossible situation (the same load function being called twice
+concurrently for the same input) newly possible. Adding a background/async
+path to existing code is a natural moment to re-check every function that
+path now touches for exactly this class of "was implicitly safe because it
+was only ever called once at a time" assumption — not just to test the new
+path in isolation.
+
+---
+
+**Pattern across all five** *(original set — #6 above is a later addition
+following the same discipline):* none of these were caught by "it works on
+my machine." #1 needed a second locale. #2 needed a second occurrence to
 become a rule instead of a patch. #3 needed a domain read of the *answer*,
 not just the math. #4 needed watching an external dependency's own
 announcements. #3 and #4 both got a regression check added (the grouping
