@@ -132,7 +132,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
           return formatDatasetSummaryForPrompt(summary);
         },
         narrate: (q, statsSummary) => generateInsight(q, statsSummary, provider),
-        buildMetaAnswer: () => buildMetaAnswer(csvData),
+        buildMetaAnswer: () => buildMetaAnswer(csvData, question),
       });
 
       for await (const update of generator) {
