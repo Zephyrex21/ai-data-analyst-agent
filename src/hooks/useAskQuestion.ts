@@ -17,6 +17,7 @@ import {
 } from "../lib/pyodide";
 import { runQueryWithRetries, type OrchestratorStage } from "../lib/queryOrchestrator";
 import { DEFAULT_PROVIDER, isProviderId, type ProviderId } from "../lib/providers";
+import { createAnswerCache } from "../lib/answerCache";
 
 export type AskStage = OrchestratorStage;
 
@@ -71,6 +72,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
   const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [provider, setProviderState] = useState<ProviderId>(loadStoredProvider);
+  const [cache] = useState(createAnswerCache);
 
   const setProvider = useCallback((next: ProviderId) => {
     setProviderState(next);
@@ -86,6 +88,28 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
   const ask = useCallback(
     async (question: string) => {
       if (!csvData || !file || !question.trim() || isBusy) return;
+
+      // A cache hit touches no API and does no real work, so it deliberately
+      // bypasses the cooldown gate entirely (and never sets one) — the
+      // cooldown exists to protect the shared LLM quota, and a cache hit
+      // never touches that quota in the first place.
+      const cached = cache.get(question, provider);
+      if (cached) {
+        const id = nextTurnId++;
+        setTurns((prev) => [
+          ...prev,
+          {
+            id,
+            stage: "done",
+            question,
+            provider,
+            error: null,
+            ...cached,
+          },
+        ]);
+        return;
+      }
+
       if (Date.now() < cooldownUntil) return; // still cooling down — ignore silently
 
       setCooldownUntil(Date.now() + COOLDOWN_MS);
@@ -135,17 +159,30 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         buildMetaAnswer: () => buildMetaAnswer(csvData, question),
       });
 
+      let merged: ConversationTurn = newTurn;
       for await (const update of generator) {
+        merged = { ...merged, ...update };
         setTurns((prev) => updateTurn(prev, id, update));
+        if (update.stage === "done") {
+          cache.set(question, provider, {
+            engine: merged.engine as Engine,
+            sql: merged.sql,
+            result: merged.result,
+            narrative: merged.narrative,
+            statsSummary: merged.statsSummary,
+            attemptsUsed: merged.attemptsUsed,
+          });
+        }
       }
     },
-    [csvData, file, isBusy, turns, cooldownUntil, provider]
+    [csvData, file, isBusy, turns, cooldownUntil, provider, cache]
   );
 
   const reset = useCallback(() => {
     setTurns([]);
     resetPythonState();
-  }, []);
+    cache.clear();
+  }, [cache]);
 
   return { turns, isBusy, ask, reset, cooldownUntil, provider, setProvider };
 }
