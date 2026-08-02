@@ -1,6 +1,6 @@
 // Phase 18 (updated in Phase 22 for the insights engine) — automated version
 // of what was previously eval-set.md's manual checklist. Hits the real
-// /api/generate-query endpoint (a live LLM call) for 26 questions and checks
+// /api/generate-query endpoint (a live LLM call) for 28 questions and checks
 // STRUCTURAL expectations: right engine, non-empty/validator-passing code
 // (sql/python) or a clean insights routing decision, no crash, destructive
 // queries actually get blocked. It does not execute the SQL/Python, call
@@ -129,6 +129,12 @@ const CASES: EvalCase[] = [
     expectEngine: "python",
     codeMatches: /scipy/i,
   },
+  // Phase 29 — greetings/small talk must route to meta (a friendly reply),
+  // not OFF_TOPIC (a decline). This is the actual bug this phase closes:
+  // before it, "hi" would get the same "I can only answer..." decline as
+  // a genuinely off-topic request.
+  { id: 27, question: "hi there!", expectEngine: "meta" },
+  { id: 28, question: "thanks so much!", expectEngine: "meta" },
 ];
 
 beforeAll(async () => {

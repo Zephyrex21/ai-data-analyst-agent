@@ -1,7 +1,7 @@
 # AI Data Analyst Agent
 
 [![CI](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-130%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-167%20passing-brightgreen)
 ![zero server cost](https://img.shields.io/badge/server%20cost-%240-blue)
 
 > Badge repo path assumes `Zephyrex21/ai-data-analyst-agent` — update if the actual GitHub repo name differs.
@@ -64,7 +64,7 @@ Everything except the LLM calls runs **entirely in your browser** — DuckDB-WAS
 | Groq (`openai/gpt-oss-120b`) + Gemini (`gemini-2.5-flash`), user-selectable | Both have workable free tiers; letting the person pick means one provider's rate limit or an outage doesn't take the whole demo down |
 | Validation layer, not just prompting | An LLM will occasionally write `MAX revenue` instead of `MAX(revenue)`, or invent a `profit_margin` column that doesn't exist. Prompting reduces this; a real validator catches what prompting misses |
 | Self-correction loop | When validation or execution fails, the exact error is fed back to the model for a fix — turns "rejected" into "usually just works" |
-| Vitest + CI | 130 tests, including mocked integration tests of the retry loop itself (not just the validators) and CSV edge cases (BOM, encodings, delimiters, line endings, size caps) — CI runs on every push |
+| Vitest + CI | 167 tests, including mocked integration tests of the retry loop itself (not just the validators) and CSV edge cases (BOM, encodings, delimiters, line endings, size caps) — CI runs on every push |
 
 ## Local development
 
@@ -86,7 +86,7 @@ npm test          # run once
 npm run test:watch
 ```
 
-130 tests: CSV parsing (including edge cases — BOM, non-UTF-8 encodings, delimiters, line endings, size caps), the SQL/Python validators, chart-type selection, conversation-history summarization, a sanity check on the bundled sample dataset, the Groq/Gemini provider abstraction (mocked fetch — no real API calls or keys needed), and integration tests of the generate→validate→execute→retry orchestration loop (mocked LLM/execution, no network needed). CI (`.github/workflows/ci.yml`) runs the full suite plus a production build on every push and pull request to `main`.
+167 tests: CSV parsing (including edge cases — BOM, non-UTF-8 encodings, delimiters, line endings, size caps), the SQL/Python validators, chart-type selection, conversation-history summarization, a sanity check on the bundled sample dataset, the Groq/Gemini provider abstraction (mocked fetch — no real API calls or keys needed), the meta-engine phrasing/greeting classifier, the chart-tweak and follow-up-suggestion parsers, the conversation-report builder, and integration tests of the generate→validate→execute→retry orchestration loop (mocked LLM/execution, no network needed). CI (`.github/workflows/ci.yml`) runs the full suite plus a production build on every push and pull request to `main`.
 
 There's also a separate, non-CI eval suite (`npm run eval`) that hits the real LLM against 18 questions to catch prompt regressions — see `eval-set.md` for why it's deliberately kept out of CI.
 
@@ -100,6 +100,11 @@ Push to GitHub, import the repo in Vercel, then add `GROQ_API_KEY` (and optional
 - Natural language → SQL (DuckDB-WASM), Python (Pyodide/pandas), a narrated "insights" answer over real precomputed stats, or a "meta" answer about the dataset's structure/capabilities — router picks per question
 - Off-topic questions get a distinct, honest decline from "on-topic but this metric doesn't exist" — the app never pretends to be a general chatbot
 - Repeat questions (re-clicking a sample question, asking the same thing twice) answer instantly from an in-memory session cache instead of burning another LLM call — cleared on reset/new upload, and switching model provider always forces a fresh call
+- Greetings and small talk ("hi", "thanks!") get a friendly reply instead of the off-topic decline — still can't be talked into answering anything unrelated to the data
+- A proactive welcome message right after upload — real row/column counts and a data-quality heads-up (e.g. "region is missing values in 12% of rows") before you've asked anything
+- Follow-up suggestions after every answer, generated from the real schema (not hardcoded) — Dev Mode toggle shows the SQL/Python behind any answer, with a one-click copy
+- Natural-language chart tweaks ("make it a bar chart", "sort descending") apply instantly to the last answer — no LLM call, since nothing new needs computing
+- Regenerate button to force a fresh (non-cached) attempt at the same question; export any chart as a PNG, or the whole conversation as a Markdown report
 - Dev Mode toggle — reveals the exact generated SQL/Python behind each answer
 - Switchable model provider (Groq or Gemini) via a selector — the choice is remembered and shown per-answer
 - Charts auto-selected by result shape (pie/bar/line/big-number), tables always available as ground truth

@@ -18,7 +18,7 @@ function resultToCsvText(result: QueryResult): string {
   return [header, ...rows].join("\n");
 }
 
-function slugifyForFilename(text: string): string {
+export function slugifyForFilename(text: string): string {
   return (
     text
       .toLowerCase()

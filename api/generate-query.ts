@@ -53,6 +53,11 @@ columns/fields does this have", "what is this dataset about" (asked as "what kin
 not "what patterns exist in it"), "what can I ask you", "how does this work", "what table is this".
 Meta is answered directly from the schema you were given, not by analyzing any data values — if the
 question needs the actual numbers/values in the data to answer, it's insights/SQL/Python instead, not meta.
+Greetings and small talk ("hi", "hello", "thanks!", "who are you", "cool", "nice one") are ALSO meta, not
+OFF_TOPIC — they're about the assistant, the same way "what can I ask you" is, and deserve a friendly
+answer rather than a decline. OFF_TOPIC is specifically for requests that want the assistant to do
+something unrelated to this dataset (write a poem, answer a trivia question, help with unrelated code),
+not for a passing "hi" or "thanks".
 
 Respond with ONLY a single JSON object, no markdown fences, no explanation outside the JSON, in exactly
 this shape:

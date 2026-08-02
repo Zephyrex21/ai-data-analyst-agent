@@ -18,6 +18,7 @@ import {
 import { runQueryWithRetries, type OrchestratorStage } from "../lib/queryOrchestrator";
 import { DEFAULT_PROVIDER, isProviderId, type ProviderId } from "../lib/providers";
 import { createAnswerCache } from "../lib/answerCache";
+import { parseChartTweak, type ChartTypeOverride, type SortOverride } from "../lib/chartTweaks";
 
 export type AskStage = OrchestratorStage;
 
@@ -46,6 +47,11 @@ function loadStoredProvider(): ProviderId {
 
 let nextTurnId = 1;
 
+export interface DisplayOverride {
+  chartType?: ChartTypeOverride;
+  sort?: SortOverride;
+}
+
 export interface ConversationTurn {
   id: number;
   stage: AskStage;
@@ -58,6 +64,8 @@ export interface ConversationTurn {
   statsSummary: string | null;
   error: string | null;
   attemptsUsed: number;
+  /** Phase 29 — a pure display tweak ("make it a bar chart") layered on top of this turn's real result. */
+  displayOverride: DisplayOverride | null;
 }
 
 function updateTurn(
@@ -86,14 +94,38 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
   const isBusy = turns.length > 0 && !["done", "error"].includes(turns[turns.length - 1].stage);
 
   const ask = useCallback(
-    async (question: string) => {
+    async (question: string, options: { forceRefresh?: boolean } = {}) => {
       if (!csvData || !file || !question.trim() || isBusy) return;
+
+      // Fastest path of all: a pure display tweak on the last real answer
+      // ("make it a bar chart", "sort descending"). Never touches the LLM,
+      // the cache, or the cooldown — there's no new data being fetched,
+      // just a different way to show data that's already sitting right
+      // there, so gating it behind any of those would make no sense.
+      const lastAnswerTurn = [...turns].reverse().find((t) => t.stage === "done" && t.result);
+      if (lastAnswerTurn) {
+        const tweak = parseChartTweak(question);
+        if (tweak) {
+          const id = nextTurnId++;
+          setTurns((prev) => [
+            ...prev,
+            {
+              ...lastAnswerTurn,
+              id,
+              question,
+              displayOverride: { ...lastAnswerTurn.displayOverride, ...tweak },
+            },
+          ]);
+          return;
+        }
+      }
 
       // A cache hit touches no API and does no real work, so it deliberately
       // bypasses the cooldown gate entirely (and never sets one) — the
       // cooldown exists to protect the shared LLM quota, and a cache hit
-      // never touches that quota in the first place.
-      const cached = cache.get(question, provider);
+      // never touches that quota in the first place. forceRefresh (the
+      // Regenerate button) explicitly skips this to force a fresh attempt.
+      const cached = options.forceRefresh ? undefined : cache.get(question, provider);
       if (cached) {
         const id = nextTurnId++;
         setTurns((prev) => [
@@ -104,6 +136,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
             question,
             provider,
             error: null,
+            displayOverride: null,
             ...cached,
           },
         ]);
@@ -127,6 +160,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
         statsSummary: null,
         error: null,
         attemptsUsed: 0,
+        displayOverride: null,
       };
 
       const history: HistoryTurn[] = turns

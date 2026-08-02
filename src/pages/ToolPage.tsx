@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCsvData } from "../hooks/useCsvData";
 import { useDuckDb } from "../hooks/useDuckDb";
 import { useAskQuestion } from "../hooks/useAskQuestion";
 import { useDevMode } from "../hooks/useDevMode";
 import { warmUpPyodide } from "../lib/pyodide";
+import { buildWelcomeSummary } from "../lib/metaAnswer";
+import { downloadConversationReport } from "../lib/downloadConversationReport";
 import { FileUpload } from "../components/FileUpload";
 import { DataTable } from "../components/DataTable";
 import { AskBar } from "../components/AskBar";
@@ -12,6 +14,7 @@ import { ProviderSelector } from "../components/ProviderSelector";
 import { DevModeToggle } from "../components/DevModeToggle";
 import { AnswerCard } from "../components/AnswerCard";
 import { SampleQuestions } from "../components/SampleQuestions";
+import { WelcomeSummary } from "../components/WelcomeSummary";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 
@@ -64,6 +67,18 @@ export function ToolPage() {
 
   const isBusy = ask.isBusy || duckDb.isLoadingTable || !duckDb.isTableReady;
 
+  const welcomeText = useMemo(() => (csv.data ? buildWelcomeSummary(csv.data) : null), [csv.data]);
+  const askedQuestions = useMemo(() => ask.turns.map((t) => t.question), [ask.turns]);
+
+  function handleRegenerate(question: string) {
+    ask.ask(question, { forceRefresh: true });
+  }
+
+  function handleExportConversation() {
+    if (!csv.data) return;
+    downloadConversationReport(ask.turns, csv.data.fileName);
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-4 gap-6">
       <Navbar onNavigate={handleNavigate} variant="tool" />
@@ -100,6 +115,8 @@ export function ToolPage() {
           </div>
         )}
 
+        {csv.data && ask.turns.length === 0 && welcomeText && <WelcomeSummary text={welcomeText} />}
+
         {csv.data && (
           <div className="flex items-center justify-end gap-2">
             <DevModeToggle devMode={devMode.devMode} onChange={devMode.setDevMode} />
@@ -122,12 +139,37 @@ export function ToolPage() {
           </p>
         )}
 
+        {ask.turns.length > 0 && (
+          <div className="flex justify-end">
+            <button
+              onClick={handleExportConversation}
+              className="text-xs font-medium text-[var(--color-accent)] hover:underline"
+            >
+              Export conversation
+            </button>
+          </div>
+        )}
+
         {ask.turns
           .map((turn, i) => ({ turn, number: i + 1 }))
           .reverse()
-          .map(({ turn, number }) => (
-            <AnswerCard key={turn.id} turn={turn} number={number} devMode={devMode.devMode} />
-          ))}
+          .map(({ turn, number }) =>
+            csv.data ? (
+              <AnswerCard
+                key={turn.id}
+                turn={turn}
+                number={number}
+                devMode={devMode.devMode}
+                csv={csv.data}
+                askedQuestions={askedQuestions}
+                isLatest={number === ask.turns.length}
+                disableActions={isBusy}
+                cooldownUntil={ask.cooldownUntil}
+                onAsk={ask.ask}
+                onRegenerate={handleRegenerate}
+              />
+            ) : null
+          )}
       </div>
 
       <Footer onBackToTop={() => navigate("/")} />
