@@ -158,6 +158,20 @@ describe("buildWelcomeSummary (Phase 29)", () => {
     expect(text).toContain("region (30%)");
   });
 
+  it("inserts a real facts sentence when given one (Phase 29 fix)", () => {
+    const text = buildWelcomeSummary(csv, "Revenue ranges from 15.2 to 983.29 (avg 312.46).");
+    expect(text).toContain("Revenue ranges from 15.2 to 983.29");
+    // Should appear between the structural intro and the closing "Ask away" line.
+    expect(text.indexOf("Revenue ranges")).toBeGreaterThan(text.indexOf("Loaded"));
+    expect(text.indexOf("Revenue ranges")).toBeLessThan(text.indexOf("Ask away"));
+  });
+
+  it("works fine with no facts sentence at all (backward compatible)", () => {
+    const text = buildWelcomeSummary(csv, null);
+    expect(text).toContain("Loaded");
+    expect(text).toContain("Ask away");
+  });
+
   it("omits the data-quality note when the data is clean", () => {
     const text = buildWelcomeSummary(csv);
     expect(text).not.toContain("Heads up");

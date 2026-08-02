@@ -250,6 +250,59 @@ function round2(n: number | null): number | null {
 }
 
 /**
+ * Renders a DatasetSummary as one or two friendly, human-readable sentences
+ * highlighting the most notable real numbers — used in the proactive
+ * welcome message (Phase 29), not sent to any model. Deliberately concise:
+ * picks a few highlights rather than dumping every stat, since the goal is
+ * "here's a taste of your data," not a full report (the collapsible facts
+ * behind any insights answer already cover the exhaustive version).
+ */
+export function formatDatasetSummaryForWelcome(summary: DatasetSummary): string | null {
+  const parts: string[] = [];
+
+  const numericHighlights = summary.columns
+    .filter((c): c is NumericColumnSummary => c.type === "number")
+    .slice(0, 2) // keep it skimmable — a wide dataset shouldn't produce a wall of numbers
+    .map((c) => `${c.name} ranges from ${formatWelcomeNumber(c.min)} to ${formatWelcomeNumber(c.max)} (avg ${formatWelcomeNumber(c.avg)})`);
+  if (numericHighlights.length > 0) parts.push(numericHighlights.join("; "));
+
+  const dateCol = summary.columns.find((c): c is DateColumnSummary => c.type === "date" && !!c.min && !!c.max);
+  if (dateCol) parts.push(`dates span ${dateCol.min} to ${dateCol.max}`);
+
+  const topCategorical = summary.columns.find(
+    (c): c is CategoricalColumnSummary =>
+      (c.type === "string" || c.type === "boolean") && c.topValues.length > 0
+  );
+  if (topCategorical) {
+    const top = topCategorical.topValues[0];
+    parts.push(`the most common ${topCategorical.name} is "${top.value}" (${top.count} rows)`);
+  }
+
+  if (summary.correlations.length > 0) {
+    const strongest = [...summary.correlations]
+      .filter((c) => c.value !== null)
+      .sort((a, b) => Math.abs(b.value as number) - Math.abs(a.value as number))[0];
+    if (strongest && Math.abs(strongest.value as number) > 0.5) {
+      const direction = (strongest.value as number) > 0 ? "positively" : "negatively";
+      parts.push(
+        `${strongest.columnA} and ${strongest.columnB} are ${direction} correlated (${round2(strongest.value)})`
+      );
+    }
+  }
+
+  if (parts.length === 0) return null;
+  // Capitalize only the first part; the rest read naturally lowercase joined by semicolons/periods.
+  const first = parts[0];
+  const capitalized = first.charAt(0).toUpperCase() + first.slice(1);
+  return [capitalized, ...parts.slice(1)].join(". ") + ".";
+}
+
+function formatWelcomeNumber(n: number | null): string {
+  if (n === null) return "n/a";
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+/**
  * Renders a DatasetSummary as compact, plain-text lines for the narration
  * prompt. Deliberately terse and numbers-only — this text is the ONLY
  * source of truth the narration model is allowed to draw from.

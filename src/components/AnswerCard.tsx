@@ -1,14 +1,11 @@
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import type { AskStage, ConversationTurn } from "../hooks/useAskQuestion";
 import type { Engine } from "../lib/llm";
-import type { ParsedCsv } from "../lib/csv";
 import { PROVIDER_OPTIONS } from "../lib/providers";
 import { chooseChartType, isSingleScalar, type ChartSpec } from "../lib/chartSelection";
-import { suggestFollowUps } from "../lib/followUpSuggestions";
 import { downloadSvgAsPng } from "../lib/downloadChartPng";
 import { BigNumberDisplay } from "./BigNumberDisplay";
 import { ResultTable } from "./ResultTable";
-import { FollowUpChips } from "./FollowUpChips";
 
 // Recharts is a sizeable dependency only needed once a chart-worthy result
 // actually appears — most single-answer/table-only questions never need it,
@@ -21,13 +18,8 @@ interface AnswerCardProps {
   turn: ConversationTurn;
   number: number;
   devMode?: boolean;
-  csv: ParsedCsv;
-  askedQuestions: string[];
-  isLatest: boolean;
   disableActions: boolean;
-  cooldownUntil: number;
-  onAsk: (question: string) => void;
-  onRegenerate: (question: string) => void;
+  onRegenerate: (turnId: number) => void;
 }
 
 const STAGE_LABELS: Record<AskStage, string> = {
@@ -68,12 +60,7 @@ export function AnswerCard({
   turn,
   number,
   devMode = false,
-  csv,
-  askedQuestions,
-  isLatest,
   disableActions,
-  cooldownUntil,
-  onAsk,
   onRegenerate,
 }: AnswerCardProps) {
   const { stage, question, sql, engine, provider, result, narrative, statsSummary, error, attemptsUsed } = turn;
@@ -106,11 +93,6 @@ export function AnswerCard({
     });
     return { ...result, rows: sorted };
   }, [result, turn.displayOverride, rawChartSpec]);
-
-  const followUps = useMemo(() => {
-    if (!isLatest || stage !== "done") return [];
-    return suggestFollowUps(csv, askedQuestions);
-  }, [isLatest, stage, csv, askedQuestions]);
 
   async function handleCopyCode() {
     if (!sql) return;
@@ -175,9 +157,9 @@ export function AnswerCard({
 
           {stage === "done" && (
             <button
-              onClick={() => onRegenerate(question)}
+              onClick={() => onRegenerate(turn.id)}
               disabled={disableActions}
-              title="Ask this again, skipping the cached answer"
+              title="Ask this again, replacing this answer with a fresh attempt"
               aria-label="Regenerate this answer"
               className="flex-shrink-0 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-accent)] disabled:opacity-40 disabled:pointer-events-none"
             >
@@ -273,13 +255,6 @@ export function AnswerCard({
         )}
 
         {result && <ResultTable result={displayedResult ?? result} questionForFilename={question} />}
-
-        <FollowUpChips
-          suggestions={followUps}
-          onAsk={onAsk}
-          isBusy={disableActions}
-          cooldownUntil={cooldownUntil}
-        />
       </div>
     </div>
   );

@@ -37,7 +37,7 @@ export async function callGroq(
     const errText = await res.text();
     if (res.status === 429) {
       throw new ProviderError(
-        "The demo is popular right now — please try again in a moment.",
+        "The demo is popular right now — please try again in a moment, or switch to Gemini using the model selector above.",
         429
       );
     }

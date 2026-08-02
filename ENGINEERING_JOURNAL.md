@@ -173,7 +173,49 @@ path in isolation.
 
 ---
 
-**Pattern across all five** *(original set — #6 above is a later addition
+## 7. The permanently-broken Python engine (found via live user feedback)
+
+**Symptom:** reported from the actual deployed app, not caught in this
+environment — a Python-routed question failed. The specific failure in the
+report turned out to be a genuine Groq rate limit (a different, correctly-
+working code path — see the "All engines" 429 handling), but tracing
+through the Python path to rule it out surfaced a real, separate bug that
+had nothing to do with rate limits at all.
+
+**Root cause:** `ensurePyodide()` (added in Phase 25, adding scipy) had this
+shape: create the Pyodide runtime, assign it to the module-level `pyodide`
+variable, *then* call `loadPackage(["pandas", "scipy"])`. If that package
+load failed for any reason — a network hiccup, scipy briefly unavailable
+from the CDN — the function would throw, but `pyodide` was already
+non-null. Every subsequent call to `ensurePyodide()` would see that and
+return immediately without retrying the load at all. One transient failure
+during a package fetch would permanently disable the entire Python engine
+for the rest of the session, with no way to recover short of a full page
+reload — and the failure mode wouldn't even look related to scipy from the
+outside, it would just look like "Python doesn't work anymore."
+
+**Fix:** restructured so `pyodide` is only assigned *after* the required
+package (pandas) has loaded successfully — a failure there leaves it
+`null`, so the next call retries cleanly from scratch. scipy specifically
+was made non-fatal: wrapped in its own `try/catch`, logged if it fails, but
+doesn't block `pyodide` from being marked ready. Code that tries to use
+scipy anyway when it failed to load will hit a normal Python
+`ImportError`, which the existing self-correction retry loop already knows
+how to feed back to the model and recover from — no new error-handling
+path needed, just not accidentally defeating the one that already existed.
+
+**Lesson:** "add an optional package to make things more powerful" and "add
+a package the whole engine now depends on to function at all" are
+different changes wearing the same one-line diff. The second one needs to
+ask what happens when *this specific new thing* fails, not just when the
+thing that was already there fails — the failure mode of a formerly-solid
+`if (pyodide) return pyodide;` early-return check only became load-bearing
+once there were two packages instead of one, and it's easy to not notice
+that a defensive-looking early return has quietly become a trap.
+
+---
+
+**Pattern across all five** *(original set — #6 and #7 are later additions
 following the same discipline):* none of these were caught by "it works on
 my machine." #1 needed a second locale. #2 needed a second occurrence to
 become a rule instead of a patch. #3 needed a domain read of the *answer*,
@@ -181,4 +223,6 @@ not just the math. #4 needed watching an external dependency's own
 announcements. #3 and #4 both got a regression check added (the grouping
 rule is exercised by the eval set's outlier case; the model swap was
 re-validated against the same eval set) specifically so the fix wouldn't
-silently regress on the next prompt change.
+silently regress on the next prompt change. #7 needed a live deployment —
+not this development environment — actually being used by someone, to
+surface a code path this environment structurally couldn't exercise.

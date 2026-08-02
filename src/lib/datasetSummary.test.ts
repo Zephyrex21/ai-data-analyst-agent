@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { computeDatasetSummary, formatDatasetSummaryForPrompt, findMentionedColumns } from "./datasetSummary";
+import { computeDatasetSummary, formatDatasetSummaryForPrompt, formatDatasetSummaryForWelcome, findMentionedColumns } from "./datasetSummary";
 import type { ParsedCsv } from "./csv";
 import type { QueryResult } from "./duckdb";
 
@@ -199,5 +199,98 @@ describe("formatDatasetSummaryForPrompt", () => {
       scopedToColumns: ["revenue"],
     });
     expect(text).toContain("Scoped to the column(s) the question named: revenue");
+  });
+});
+
+describe("formatDatasetSummaryForWelcome (Phase 29 fix — detailed welcome message)", () => {
+  it("returns null when there's nothing notable to highlight", () => {
+    const text = formatDatasetSummaryForWelcome({
+      totalRows: 10,
+      columns: [],
+      correlations: [],
+      scopedToColumns: null,
+    });
+    expect(text).toBeNull();
+  });
+
+  it("includes a numeric column's real range and average", () => {
+    const text = formatDatasetSummaryForWelcome({
+      totalRows: 10,
+      columns: [{ name: "revenue", type: "number", min: 15.2, max: 983.29, avg: 312.456, stddev: 100, nullCount: 0 }],
+      correlations: [],
+      scopedToColumns: null,
+    });
+    expect(text).toContain("Revenue ranges from 15.2 to 983.29");
+    expect(text).toContain("avg 312.46");
+  });
+
+  it("includes the real date range", () => {
+    const text = formatDatasetSummaryForWelcome({
+      totalRows: 10,
+      columns: [{ name: "order_date", type: "date", min: "2025-10-01", max: "2025-10-04", nullCount: 0 }],
+      correlations: [],
+      scopedToColumns: null,
+    });
+    expect(text).toContain("Dates span 2025-10-01 to 2025-10-04");
+  });
+
+  it("includes the top categorical value with its real count", () => {
+    const text = formatDatasetSummaryForWelcome({
+      totalRows: 10,
+      columns: [
+        {
+          name: "region",
+          type: "string",
+          distinctCount: 4,
+          topValues: [{ value: "North", count: 360 }],
+          nullCount: 0,
+        },
+      ],
+      correlations: [],
+      scopedToColumns: null,
+    });
+    expect(text).toContain('most common region is "North" (360 rows)');
+  });
+
+  it("mentions a strong correlation but not a weak one", () => {
+    const strong = formatDatasetSummaryForWelcome({
+      totalRows: 10,
+      columns: [],
+      correlations: [{ columnA: "revenue", columnB: "units_sold", value: 0.91 }],
+      scopedToColumns: null,
+    });
+    expect(strong).toContain("Revenue and units_sold are positively correlated (0.91)");
+
+    const weak = formatDatasetSummaryForWelcome({
+      totalRows: 10,
+      columns: [],
+      correlations: [{ columnA: "revenue", columnB: "units_sold", value: 0.12 }],
+      scopedToColumns: null,
+    });
+    expect(weak).toBeNull();
+  });
+
+  it("labels a negative correlation correctly", () => {
+    const text = formatDatasetSummaryForWelcome({
+      totalRows: 10,
+      columns: [],
+      correlations: [{ columnA: "price", columnB: "units_sold", value: -0.72 }],
+      scopedToColumns: null,
+    });
+    expect(text).toContain("negatively correlated");
+  });
+
+  it("caps numeric highlights at 2 columns to stay skimmable", () => {
+    const text = formatDatasetSummaryForWelcome({
+      totalRows: 10,
+      columns: [
+        { name: "a", type: "number", min: 1, max: 2, avg: 1.5, stddev: 0.5, nullCount: 0 },
+        { name: "b", type: "number", min: 1, max: 2, avg: 1.5, stddev: 0.5, nullCount: 0 },
+        { name: "c", type: "number", min: 1, max: 2, avg: 1.5, stddev: 0.5, nullCount: 0 },
+      ],
+      correlations: [],
+      scopedToColumns: null,
+    });
+    expect(text).not.toContain("c ranges");
   });
 });

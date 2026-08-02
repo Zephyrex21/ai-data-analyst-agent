@@ -9,12 +9,31 @@ let pyodide: PyodideAPI | null = null;
 
 async function ensurePyodide(): Promise<PyodideAPI> {
   if (pyodide) return pyodide;
-  pyodide = await loadPyodide({ indexURL: PYODIDE_CDN_INDEX_URL });
+
+  const instance = await loadPyodide({ indexURL: PYODIDE_CDN_INDEX_URL });
+  // Required — if this throws, `pyodide` stays null so the NEXT call
+  // retries from scratch instead of being permanently stuck.
+  await instance.loadPackage(["pandas"]);
+
   // scipy added in Phase 25 so outlier/regression questions can use tested
   // functions (scipy.stats.zscore, scipy.stats.linregress) instead of the
   // model hand-rolling that math inline every time — see api/generate-query.ts's
   // system prompt and Engineering Journal bug #3 for why that matters.
-  await pyodide.loadPackage(["pandas", "scipy"]);
+  // Deliberately optional: if it fails to load (network hiccup, package
+  // temporarily unavailable), Python still works for everything except
+  // scipy-specific code — code that tries to import it anyway will hit a
+  // normal Python ImportError, which the existing self-correction retry
+  // loop already knows how to feed back and recover from. Better than the
+  // entire Python engine becoming permanently unusable over one optional
+  // package, which is what happened before this fix: a scipy failure used
+  // to leave `pyodide` set but broken, with no way to retry.
+  try {
+    await instance.loadPackage(["scipy"]);
+  } catch (err) {
+    console.error("scipy failed to load — Python will still work without it:", err);
+  }
+
+  pyodide = instance;
   return pyodide;
 }
 

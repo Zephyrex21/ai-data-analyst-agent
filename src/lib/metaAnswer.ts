@@ -145,14 +145,22 @@ export function summarizeDataQuality(csv: ParsedCsv): string | null {
  * person has asked anything. Reuses the same real schema facts as
  * buildMetaAnswer — this is the "feels like it already looked at my file"
  * first impression, and it costs nothing to show.
+ *
+ * `factsSentence`, if given, is the real computed min/max/avg/correlation
+ * highlights from datasetSummary.ts's formatDatasetSummaryForWelcome —
+ * optional because it needs a DuckDB round trip the caller may not have
+ * run yet (or may choose to show a quick structural-only version while
+ * that's still loading).
  */
-export function buildWelcomeSummary(csv: ParsedCsv): string {
+export function buildWelcomeSummary(csv: ParsedCsv, factsSentence?: string | null): string {
   const realColumns = csv.columns.filter((c) => c.type !== "empty");
   const columnList = realColumns.map((c) => c.name).join(", ");
   const rowCountText = `${csv.totalRows.toLocaleString("en-US")} row${csv.totalRows === 1 ? "" : "s"}`;
   const columnCountText = `${realColumns.length} column${realColumns.length === 1 ? "" : "s"}`;
 
   let text = `Loaded "${csv.fileName}" — ${rowCountText} across ${columnCountText}: ${columnList}.`;
+
+  if (factsSentence) text += ` ${factsSentence}`;
 
   const qualityNote = summarizeDataQuality(csv);
   if (qualityNote) text += ` ${qualityNote}`;

@@ -4,8 +4,9 @@ import { useCsvData } from "../hooks/useCsvData";
 import { useDuckDb } from "../hooks/useDuckDb";
 import { useAskQuestion } from "../hooks/useAskQuestion";
 import { useDevMode } from "../hooks/useDevMode";
+import { useWelcomeSummary } from "../hooks/useWelcomeSummary";
 import { warmUpPyodide } from "../lib/pyodide";
-import { buildWelcomeSummary } from "../lib/metaAnswer";
+import { suggestFollowUps } from "../lib/followUpSuggestions";
 import { downloadConversationReport } from "../lib/downloadConversationReport";
 import { FileUpload } from "../components/FileUpload";
 import { DataTable } from "../components/DataTable";
@@ -14,6 +15,7 @@ import { ProviderSelector } from "../components/ProviderSelector";
 import { DevModeToggle } from "../components/DevModeToggle";
 import { AnswerCard } from "../components/AnswerCard";
 import { SampleQuestions } from "../components/SampleQuestions";
+import { FollowUpChips } from "../components/FollowUpChips";
 import { WelcomeSummary } from "../components/WelcomeSummary";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
@@ -26,6 +28,7 @@ export function ToolPage() {
   const duckDb = useDuckDb();
   const ask = useAskQuestion(csv.data, uploadedFile);
   const devMode = useDevMode();
+  const welcome = useWelcomeSummary(csv.data, duckDb.isTableReady);
 
   function handleNavigate(id: string) {
     if (id === "top") {
@@ -67,12 +70,13 @@ export function ToolPage() {
 
   const isBusy = ask.isBusy || duckDb.isLoadingTable || !duckDb.isTableReady;
 
-  const welcomeText = useMemo(() => (csv.data ? buildWelcomeSummary(csv.data) : null), [csv.data]);
   const askedQuestions = useMemo(() => ask.turns.map((t) => t.question), [ask.turns]);
 
-  function handleRegenerate(question: string) {
-    ask.ask(question, { forceRefresh: true });
-  }
+  const latestTurn = ask.turns.length > 0 ? ask.turns[ask.turns.length - 1] : null;
+  const followUps = useMemo(() => {
+    if (!csv.data || !latestTurn || latestTurn.stage !== "done") return [];
+    return suggestFollowUps(csv.data, askedQuestions);
+  }, [csv.data, latestTurn, askedQuestions]);
 
   function handleExportConversation() {
     if (!csv.data) return;
@@ -115,7 +119,16 @@ export function ToolPage() {
           </div>
         )}
 
-        {csv.data && ask.turns.length === 0 && welcomeText && <WelcomeSummary text={welcomeText} />}
+        {csv.data && ask.turns.length === 0 && (
+          <>
+            {welcome.text && <WelcomeSummary text={welcome.text} />}
+            {welcome.loading && !welcome.text && (
+              <p className="text-xs text-[var(--color-text-muted)] text-center">
+                Looking at your data…
+              </p>
+            )}
+          </>
+        )}
 
         {csv.data && (
           <div className="flex items-center justify-end gap-2">
@@ -129,8 +142,21 @@ export function ToolPage() {
           <AskBar onAsk={ask.ask} isBusy={isBusy} cooldownUntil={ask.cooldownUntil} />
         )}
 
+        {/* Follow-up suggestions always live right below the prompt box —
+            never buried at the bottom of an answer card. SampleQuestions
+            (before anything's been asked) and FollowUpChips (after the
+            latest answer) occupy the exact same slot, one replacing the
+            other as the conversation progresses. */}
         {csv.data && isSampleData && ask.turns.length === 0 && (
           <SampleQuestions onAsk={ask.ask} isBusy={isBusy} cooldownUntil={ask.cooldownUntil} />
+        )}
+        {csv.data && ask.turns.length > 0 && (
+          <FollowUpChips
+            suggestions={followUps}
+            onAsk={ask.ask}
+            isBusy={isBusy}
+            cooldownUntil={ask.cooldownUntil}
+          />
         )}
 
         {csv.data && duckDb.isLoadingTable && (
@@ -153,23 +179,16 @@ export function ToolPage() {
         {ask.turns
           .map((turn, i) => ({ turn, number: i + 1 }))
           .reverse()
-          .map(({ turn, number }) =>
-            csv.data ? (
-              <AnswerCard
-                key={turn.id}
-                turn={turn}
-                number={number}
-                devMode={devMode.devMode}
-                csv={csv.data}
-                askedQuestions={askedQuestions}
-                isLatest={number === ask.turns.length}
-                disableActions={isBusy}
-                cooldownUntil={ask.cooldownUntil}
-                onAsk={ask.ask}
-                onRegenerate={handleRegenerate}
-              />
-            ) : null
-          )}
+          .map(({ turn, number }) => (
+            <AnswerCard
+              key={turn.id}
+              turn={turn}
+              number={number}
+              devMode={devMode.devMode}
+              disableActions={isBusy}
+              onRegenerate={ask.regenerate}
+            />
+          ))}
       </div>
 
       <Footer onBackToTop={() => navigate("/")} />
