@@ -1,3 +1,5 @@
+import { isProviderId, DEFAULT_PROVIDER, type ProviderId } from "./providers";
+
 export class LlmError extends Error {}
 
 export type Engine = "sql" | "python" | "insights" | "meta";
@@ -18,12 +20,15 @@ export interface HistoryTurn {
 export interface GeneratedQuery {
   engine: Engine;
   code: string;
+  /** Which provider actually answered — may differ from what was requested if server-side fallback (Phase 30) kicked in. */
+  provider: ProviderId;
 }
 
 interface GenerateQueryResponse {
   engine?: string;
   code?: string;
   error?: string;
+  provider?: string;
 }
 
 export async function generateQuery(
@@ -79,19 +84,29 @@ export async function generateQuery(
   if (data.engine !== "insights" && data.engine !== "meta" && !data.code) {
     throw new LlmError("Server didn't return any code.");
   }
-  return { engine: data.engine, code: data.code ?? "" };
+  return {
+    engine: data.engine,
+    code: data.code ?? "",
+    provider: isProviderId(data.provider) ? data.provider : DEFAULT_PROVIDER,
+  };
 }
 
 interface GenerateInsightResponse {
   narrative?: string;
   error?: string;
+  provider?: string;
+}
+
+export interface GeneratedInsight {
+  narrative: string;
+  provider: ProviderId;
 }
 
 export async function generateInsight(
   question: string,
   statsSummary: string,
   provider?: string
-): Promise<string> {
+): Promise<GeneratedInsight> {
   let res: Response;
   try {
     res = await fetch("/api/generate-insights", {
@@ -126,5 +141,8 @@ export async function generateInsight(
   if (!data.narrative) {
     throw new LlmError("Server didn't return a narrative.");
   }
-  return data.narrative;
+  return {
+    narrative: data.narrative,
+    provider: isProviderId(data.provider) ? data.provider : DEFAULT_PROVIDER,
+  };
 }

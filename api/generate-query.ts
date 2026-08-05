@@ -1,4 +1,4 @@
-import { PROVIDERS, DEFAULT_PROVIDER, isProviderId, ProviderError, type ProviderId } from "./providers";
+import { DEFAULT_PROVIDER, isProviderId, ProviderError, callWithFallback, type ProviderId } from "./providers";
 import { jsonResponse, log, parseModelJson } from "./_lib/util";
 
 export const config = { runtime: "edge" };
@@ -152,22 +152,14 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   // Whitelist the provider explicitly — never let a client-supplied string
-  // pick which env var/key gets read.
-  const provider: ProviderId = isProviderId(body.provider) ? body.provider : DEFAULT_PROVIDER;
-  const providerConfig = PROVIDERS[provider];
-
-  const apiKey = process.env[providerConfig.envKey];
-  if (!apiKey) {
-    return jsonResponse(
-      {
-        error: `Server is missing ${providerConfig.envKey}. Add it in your Vercel project's Environment Variables, then redeploy.`,
-      },
-      500
-    );
-  }
+  // pick which env var/key gets read. This is the PREFERRED provider;
+  // callWithFallback below may end up using a different one if this one
+  // fails, which is why the actual response echoes back whichever provider
+  // really answered, not necessarily this one.
+  const preferredProvider: ProviderId = isProviderId(body.provider) ? body.provider : DEFAULT_PROVIDER;
 
   log("request_received", {
-    provider,
+    preferredProvider,
     isRetry: Boolean(previousAttempt),
     historyLength: history?.length ?? 0,
   });
@@ -193,7 +185,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const raw = await providerConfig.call(apiKey, SYSTEM_PROMPT, userPrompt);
+    const { raw, providerUsed } = await callWithFallback(preferredProvider, SYSTEM_PROMPT, userPrompt, log);
 
     const parsed = parseModelJson<ParsedModelResponse>(raw);
     if (!parsed) {
@@ -221,11 +213,11 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     if (parsed.engine === "insights") {
-      return jsonResponse({ engine: "insights", provider }, 200);
+      return jsonResponse({ engine: "insights", provider: providerUsed }, 200);
     }
 
     if (parsed.engine === "meta") {
-      return jsonResponse({ engine: "meta", provider }, 200);
+      return jsonResponse({ engine: "meta", provider: providerUsed }, 200);
     }
 
     if (parsed.engine !== "sql" && parsed.engine !== "python") {
@@ -237,14 +229,14 @@ export default async function handler(req: Request): Promise<Response> {
 
     const code = parsed.engine === "sql" ? cleanSql(parsed.code) : parsed.code.trim();
 
-    return jsonResponse({ engine: parsed.engine, code, provider }, 200);
+    return jsonResponse({ engine: parsed.engine, code, provider: providerUsed }, 200);
   } catch (err) {
     if (err instanceof ProviderError) {
-      log("provider_error", { provider, status: err.status });
+      log("all_providers_failed", { preferredProvider, status: err.status });
       return jsonResponse({ error: err.message }, err.status);
     }
     log("unhandled_exception", {
-      provider,
+      preferredProvider,
       message: err instanceof Error ? err.message : String(err),
     });
     return jsonResponse(

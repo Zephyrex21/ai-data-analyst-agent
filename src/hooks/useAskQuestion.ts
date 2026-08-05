@@ -150,6 +150,7 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
             narrative: merged.narrative,
             statsSummary: merged.statsSummary,
             attemptsUsed: merged.attemptsUsed,
+            actualProvider: merged.provider ?? provider,
           });
         }
       }
@@ -197,10 +198,17 @@ export function useAskQuestion(csvData: ParsedCsv | null, file: File | null) {
             id,
             stage: "done",
             question,
-            provider,
             error: null,
             displayOverride: null,
-            ...cached,
+            engine: cached.engine,
+            sql: cached.sql,
+            result: cached.result,
+            narrative: cached.narrative,
+            statsSummary: cached.statsSummary,
+            attemptsUsed: cached.attemptsUsed,
+            // The truth of who actually answered, not necessarily who was
+            // requested — see CachedAnswer.actualProvider's doc comment.
+            provider: cached.actualProvider,
           },
         ]);
         return;

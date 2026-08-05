@@ -31,12 +31,9 @@ export async function callGemini(
   if (!res.ok) {
     const errText = await res.text();
     if (res.status === 429) {
-      throw new ProviderError(
-        "The demo is popular right now — please try again in a moment, or switch to Groq using the model selector above.",
-        429
-      );
+      throw new ProviderError("Gemini rate limit hit.", 429);
     }
-    throw new ProviderError(`Gemini API error (${res.status}): ${errText.slice(0, 300)}`, 502);
+    throw new ProviderError(`Gemini API error (${res.status}): ${errText.slice(0, 300)}`, res.status >= 500 ? 502 : res.status);
   }
 
   const data = await res.json();

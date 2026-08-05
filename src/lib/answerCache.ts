@@ -16,6 +16,14 @@ export interface CachedAnswer {
   narrative: string | null;
   statsSummary: string | null;
   attemptsUsed: number;
+  /**
+   * Which provider actually produced this answer — NOT necessarily the same
+   * as the `provider` this entry is keyed under. The cache key is the
+   * PREFERRED provider (what the person had selected), but server-side
+   * fallback (Phase 30) may have used a different one to actually answer.
+   * Replaying a cache hit should show the truth, not the original request.
+   */
+  actualProvider: ProviderId;
 }
 
 export interface AnswerCache {

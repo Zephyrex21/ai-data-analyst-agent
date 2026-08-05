@@ -5,7 +5,7 @@
 // about the shared {engine, code} JSON contract, never about Groq's or
 // Gemini's specific request/response shapes.
 
-export type ProviderId = "groq" | "gemini";
+export type ProviderId = "groq" | "gemini" | "mistral" | "cerebras" | "cohere";
 
 export class ProviderError extends Error {
   status: number;

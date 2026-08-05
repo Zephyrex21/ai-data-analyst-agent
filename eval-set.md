@@ -18,10 +18,12 @@ Against a deployed URL instead of local:
 EVAL_BASE_URL=https://your-app.vercel.app npm run eval
 ```
 
-Runs against Groq by default; to check the same 28 cases against Gemini instead:
+Runs preferring Groq by default; to prefer a different provider instead
+(Phase 30 note: this is a *preference* — if that provider is itself busy,
+the server automatically falls back to another configured one):
 
 ```bash
-EVAL_PROVIDER=gemini npm run eval
+EVAL_PROVIDER=mistral npm run eval   # or gemini / cerebras / cohere
 ```
 
 ## What it checks

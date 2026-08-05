@@ -186,6 +186,7 @@ export function ToolPage() {
               number={number}
               devMode={devMode.devMode}
               disableActions={isBusy}
+              selectedProvider={ask.provider}
               onRegenerate={ask.regenerate}
             />
           ))}

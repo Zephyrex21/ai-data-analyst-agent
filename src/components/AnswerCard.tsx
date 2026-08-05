@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import type { AskStage, ConversationTurn } from "../hooks/useAskQuestion";
 import type { Engine } from "../lib/llm";
-import { PROVIDER_OPTIONS } from "../lib/providers";
+import { PROVIDER_OPTIONS, type ProviderId } from "../lib/providers";
 import { chooseChartType, isSingleScalar, type ChartSpec } from "../lib/chartSelection";
 import { downloadSvgAsPng } from "../lib/downloadChartPng";
 import { BigNumberDisplay } from "./BigNumberDisplay";
@@ -19,6 +19,8 @@ interface AnswerCardProps {
   number: number;
   devMode?: boolean;
   disableActions: boolean;
+  /** Currently-selected provider — compared against turn.provider to show a fallback note if they differ (Phase 30). */
+  selectedProvider: ProviderId;
   onRegenerate: (turnId: number) => void;
 }
 
@@ -61,6 +63,7 @@ export function AnswerCard({
   number,
   devMode = false,
   disableActions,
+  selectedProvider,
   onRegenerate,
 }: AnswerCardProps) {
   const { stage, question, sql, engine, provider, result, narrative, statsSummary, error, attemptsUsed } = turn;
@@ -78,6 +81,7 @@ export function AnswerCard({
   const { spec: chartSpec, forceTable } = applyChartOverride(rawChartSpec, turn.displayOverride);
   const showBigNumber = result ? isSingleScalar(result) : false;
   const providerLabel = PROVIDER_OPTIONS.find((p) => p.id === provider)?.label ?? provider;
+  const usedFallback = stage === "done" && provider !== selectedProvider;
 
   // Sort tweaks only apply when the result fits the classic "one label +
   // one numeric value" shape chooseChartType already detects — for wider,
@@ -145,6 +149,14 @@ export function AnswerCard({
               {engine && (
                 <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]">
                   {providerLabel}
+                </span>
+              )}
+              {usedFallback && (
+                <span
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                  title="Your selected provider was busy, so this answer came from a different one automatically"
+                >
+                  auto-switched
                 </span>
               )}
               {stage === "done" && attemptsUsed > 1 && (

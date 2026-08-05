@@ -1,4 +1,4 @@
-import { PROVIDERS, DEFAULT_PROVIDER, isProviderId, ProviderError, type ProviderId } from "./providers";
+import { DEFAULT_PROVIDER, isProviderId, ProviderError, callWithFallback, type ProviderId } from "./providers";
 import { jsonResponse, log, parseModelJson } from "./_lib/util";
 
 export const config = { runtime: "edge" };
@@ -48,25 +48,14 @@ export default async function handler(req: Request): Promise<Response> {
     return jsonResponse({ error: "Missing question or statsSummary." }, 400);
   }
 
-  const provider: ProviderId = isProviderId(body.provider) ? body.provider : DEFAULT_PROVIDER;
-  const providerConfig = PROVIDERS[provider];
+  const preferredProvider: ProviderId = isProviderId(body.provider) ? body.provider : DEFAULT_PROVIDER;
 
-  const apiKey = process.env[providerConfig.envKey];
-  if (!apiKey) {
-    return jsonResponse(
-      {
-        error: `Server is missing ${providerConfig.envKey}. Add it in your Vercel project's Environment Variables, then redeploy.`,
-      },
-      500
-    );
-  }
-
-  log("insights_request_received", { provider });
+  log("insights_request_received", { preferredProvider });
 
   const userPrompt = `Dataset statistics:\n${statsSummary}\n\nQuestion: ${question}`;
 
   try {
-    const raw = await providerConfig.call(apiKey, SYSTEM_PROMPT, userPrompt);
+    const { raw, providerUsed } = await callWithFallback(preferredProvider, SYSTEM_PROMPT, userPrompt, log);
 
     const parsed = parseModelJson<ParsedInsightResponse>(raw);
     if (!parsed || typeof parsed.narrative !== "string" || !parsed.narrative.trim()) {
@@ -76,14 +65,14 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
-    return jsonResponse({ narrative: parsed.narrative.trim(), provider }, 200);
+    return jsonResponse({ narrative: parsed.narrative.trim(), provider: providerUsed }, 200);
   } catch (err) {
     if (err instanceof ProviderError) {
-      log("insights_provider_error", { provider, status: err.status });
+      log("insights_all_providers_failed", { preferredProvider, status: err.status });
       return jsonResponse({ error: err.message }, err.status);
     }
     log("insights_unhandled_exception", {
-      provider,
+      preferredProvider,
       message: err instanceof Error ? err.message : String(err),
     });
     return jsonResponse(

@@ -1,14 +1,14 @@
 # AI Data Analyst Agent
 
 [![CI](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-176%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-196%20passing-brightgreen)
 ![zero server cost](https://img.shields.io/badge/server%20cost-%240-blue)
 
 > Badge repo path assumes `Zephyrex21/ai-data-analyst-agent` — update if the actual GitHub repo name differs.
 
 Upload a CSV, ask questions about it in plain English, get a real, verified, executed answer back — not a guess. **[Try it live →](https://ai-data-analyst-agent-one.vercel.app/)** (loads a sample dataset with one click, no upload required).
 
-**Data privacy, in one line:** your CSV never leaves your browser — DuckDB and Python both run client-side; the only thing that touches a server is the plain-text question itself, sent to whichever model provider (Groq or Gemini) you've selected to generate query code (never your data).
+**Data privacy, in one line:** your CSV never leaves your browser — DuckDB and Python both run client-side; the only thing that touches a server is the plain-text question itself, sent to whichever model provider actually answers (Groq, Gemini, Mistral, Cerebras, or Cohere — see below) to generate query code (never your data).
 
 ## The problem this solves
 
@@ -24,7 +24,7 @@ flowchart TD
     P --> D["DuckDB-WASM<br/>(in-browser SQL engine)"]
 
     Q["Question<br/>(plain English)"] --> E["Edge Function<br/>/api/generate-query"]
-    E --> G["Groq or Gemini<br/>(user-selected)"]
+    E --> G["Preferred provider, then automatic<br/>fallback through up to 4 more<br/>(Groq → Gemini → Mistral → Cerebras → Cohere)"]
     G -->|"SQL, Python, insights, or meta"| V{"Validator"}
 
     V -->|"SQL"| D
@@ -35,7 +35,7 @@ flowchart TD
     R --> E
 
     STAT --> NAR["Edge Function<br/>/api/generate-insights"]
-    NAR --> G2["Groq or Gemini<br/>(narrates ONLY the real stats)"]
+    NAR --> G2["Same 5-provider fallback chain<br/>(narrates ONLY the real stats)"]
     G2 --> NARR["Narrative"]
 
     D --> RES["Result"]
@@ -61,10 +61,10 @@ Everything except the LLM calls runs **entirely in your browser** — DuckDB-WAS
 |---|---|
 | DuckDB-WASM over a backend DB | Zero server cost, zero server security surface — nothing executes anywhere but the user's own browser |
 | Pyodide in a **Web Worker**, warmed up in the background right after upload | Running Python/pandas on the main thread would freeze the UI during the ~10-20s first load; the worker keeps the page responsive, and starting that download immediately after upload (Phase 25) means it's often already done by the time a question actually needs it — skipped automatically if the browser signals data-saver mode |
-| Groq (`openai/gpt-oss-120b`) + Gemini (`gemini-2.5-flash`), user-selectable | Both have workable free tiers; letting the person pick means one provider's rate limit or an outage doesn't take the whole demo down |
+| Groq, Gemini, Mistral, Cerebras, Cohere — 5 free-tier providers with automatic server-side failover (Phase 30) | Each has a workable free tier with a different rate-limit window (per-minute, per-day, per-month); picking one and cascading through the rest on failure means a single provider being rate-limited no longer means "server busy" |
 | Validation layer, not just prompting | An LLM will occasionally write `MAX revenue` instead of `MAX(revenue)`, or invent a `profit_margin` column that doesn't exist. Prompting reduces this; a real validator catches what prompting misses |
 | Self-correction loop | When validation or execution fails, the exact error is fed back to the model for a fix — turns "rejected" into "usually just works" |
-| Vitest + CI | 176 tests, including mocked integration tests of the retry loop itself (not just the validators) and CSV edge cases (BOM, encodings, delimiters, line endings, size caps) — CI runs on every push |
+| Vitest + CI | 196 tests, including mocked integration tests of the retry loop itself (not just the validators) and CSV edge cases (BOM, encodings, delimiters, line endings, size caps) — CI runs on every push |
 
 ## Local development
 
@@ -77,7 +77,7 @@ cp .env.local.example .env.local   # then paste your real key(s) into .env.local
 vercel dev
 ```
 
-Get a free Groq API key (no card required) at https://console.groq.com. The Gemini option is optional — get a free key at https://aistudio.google.com/apikey and add `GEMINI_API_KEY` too if you want it; without it, the Gemini option in the selector will just return a clear "missing key" error instead of breaking anything else.
+Get a free Groq API key (no card required) at https://console.groq.com — that's the only one required. Everything else is optional: add any of `GEMINI_API_KEY` ([aistudio.google.com](https://aistudio.google.com/apikey)), `MISTRAL_API_KEY` ([console.mistral.ai](https://console.mistral.ai)), `CEREBRAS_API_KEY` ([cloud.cerebras.ai](https://cloud.cerebras.ai)), or `COHERE_API_KEY` ([dashboard.cohere.com](https://dashboard.cohere.com)) — all free, none need a card. More keys means more automatic failover (Phase 30): if your preferred provider is rate-limited, the server tries the next configured one immediately instead of showing an error. Missing keys are simply skipped, not required.
 
 ## Testing
 
@@ -86,13 +86,13 @@ npm test          # run once
 npm run test:watch
 ```
 
-176 tests: CSV parsing (including edge cases — BOM, non-UTF-8 encodings, delimiters, line endings, size caps), the SQL/Python validators, chart-type selection, conversation-history summarization, a sanity check on the bundled sample dataset, the Groq/Gemini provider abstraction (mocked fetch — no real API calls or keys needed), the meta-engine phrasing/greeting classifier, the chart-tweak and follow-up-suggestion parsers, the conversation-report builder, and integration tests of the generate→validate→execute→retry orchestration loop (mocked LLM/execution, no network needed). CI (`.github/workflows/ci.yml`) runs the full suite plus a production build on every push and pull request to `main`.
+196 tests: CSV parsing (including edge cases — BOM, non-UTF-8 encodings, delimiters, line endings, size caps), the SQL/Python validators, chart-type selection, conversation-history summarization, a sanity check on the bundled sample dataset, the 5-provider abstraction and its automatic failover cascade (mocked fetch — no real API calls or keys needed), the meta-engine phrasing/greeting classifier, the chart-tweak and follow-up-suggestion parsers, the conversation-report builder, and integration tests of the generate→validate→execute→retry orchestration loop (mocked LLM/execution, no network needed). CI (`.github/workflows/ci.yml`) runs the full suite plus a production build on every push and pull request to `main`.
 
 There's also a separate, non-CI eval suite (`npm run eval`) that hits the real LLM against 18 questions to catch prompt regressions — see `eval-set.md` for why it's deliberately kept out of CI.
 
 ## Deploying
 
-Push to GitHub, import the repo in Vercel, then add `GROQ_API_KEY` (and optionally `GEMINI_API_KEY`) under Project Settings → Environment Variables and redeploy.
+Push to GitHub, import the repo in Vercel, then add `GROQ_API_KEY` (required) and optionally any of `GEMINI_API_KEY` / `MISTRAL_API_KEY` / `CEREBRAS_API_KEY` / `COHERE_API_KEY` under Project Settings → Environment Variables and redeploy.
 
 ## Feature overview
 
@@ -106,7 +106,7 @@ Push to GitHub, import the repo in Vercel, then add `GROQ_API_KEY` (and optional
 - Natural-language chart tweaks ("make it a bar chart", "sort descending") apply instantly to the last answer — no LLM call, since nothing new needs computing
 - Regenerate button to force a fresh (non-cached) attempt at the same question; export any chart as a PNG, or the whole conversation as a Markdown report
 - Dev Mode toggle — reveals the exact generated SQL/Python behind each answer
-- Switchable model provider (Groq or Gemini) via a selector — the choice is remembered and shown per-answer
+- Switchable model provider (Groq, Gemini, Mistral, Cerebras, or Cohere) via a dropdown showing each model's name and a quick descriptor (Fast, Balanced, Efficient, Fastest, Fallback) — your pick is remembered and shown per-answer. If your preferred provider is rate-limited, the server automatically tries the next configured one instead of failing — and if that happens, the answer is honestly labeled "auto-switched," never silently swapped
 - Charts auto-selected by result shape (pie/bar/line/big-number), tables always available as ground truth
 - Safety validator: blocks non-SELECT statements, unknown tables/columns, unsafe Python patterns; caps result size
 - Self-correcting retry loop (max 3 attempts) with full error context fed back to the model

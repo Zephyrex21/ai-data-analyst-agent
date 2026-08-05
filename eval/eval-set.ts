@@ -33,10 +33,20 @@ import { validateSql } from "../src/lib/sqlValidator";
 
 const BASE_URL = process.env.EVAL_BASE_URL ?? "http://localhost:3000";
 const ENDPOINT = `${BASE_URL}/api/generate-query`;
-// Which provider the eval set exercises. Defaults to Groq since that's the
-// original/primary provider; pass EVAL_PROVIDER=gemini to run the same 18
-// cases against Gemini instead (needs GEMINI_API_KEY set for `vercel dev`).
-const PROVIDER = process.env.EVAL_PROVIDER === "gemini" ? "gemini" : "groq";
+const KNOWN_PROVIDERS = ["groq", "gemini", "mistral", "cerebras", "cohere"];
+// Which provider the eval set PREFERS. Defaults to Groq; pass
+// EVAL_PROVIDER=mistral (or gemini/cerebras/cohere) to prefer a different
+// one instead. Note this is a PREFERENCE, not a guarantee (Phase 30): if
+// the preferred provider is itself rate-limited during the eval run, the
+// server automatically falls back to another configured one — which is
+// fine for these structural/routing checks (they don't care which model
+// answered, just that the routing behavior is correct), but means don't
+// read too much into "EVAL_PROVIDER=X passed" as proof X specifically
+// handled every case if you want that guarantee, check the response body's
+// own `provider` field per case, or temporarily unset the other API keys.
+const PROVIDER = KNOWN_PROVIDERS.includes(process.env.EVAL_PROVIDER ?? "")
+  ? (process.env.EVAL_PROVIDER as string)
+  : "groq";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const csvPath = path.join(__dirname, "..", "public", "sample-sales-data.csv");

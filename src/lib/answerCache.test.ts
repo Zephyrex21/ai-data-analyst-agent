@@ -8,6 +8,7 @@ const answer: CachedAnswer = {
   narrative: null,
   statsSummary: null,
   attemptsUsed: 1,
+  actualProvider: "groq",
 };
 
 describe("createAnswerCache", () => {
@@ -48,5 +49,14 @@ describe("createAnswerCache", () => {
     cache.clear();
     expect(cache.get("how many rows", "groq")).toBeUndefined();
     expect(cache.get("how many rows", "gemini")).toBeUndefined();
+  });
+
+  it("preserves actualProvider separately from the requested provider it's keyed under — Phase 30 fallback tracking", () => {
+    const cache = createAnswerCache();
+    // Cached under "groq" (what was requested/preferred), but the server
+    // actually answered with gemini due to fallback.
+    cache.set("how many rows", "groq", { ...answer, actualProvider: "gemini" });
+    const hit = cache.get("how many rows", "groq");
+    expect(hit?.actualProvider).toBe("gemini");
   });
 });

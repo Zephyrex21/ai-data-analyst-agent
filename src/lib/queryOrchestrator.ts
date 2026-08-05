@@ -4,6 +4,7 @@ import { validateSql } from "./sqlValidator";
 import { validatePythonCode } from "./pythonValidator";
 import type { Engine, HistoryTurn, PreviousAttempt } from "./llm";
 import type { QueryResult } from "./duckdb";
+import type { ProviderId } from "./providers";
 
 export type OrchestratorStage =
   | "generating-sql"
@@ -18,6 +19,8 @@ export interface OrchestratorUpdate {
   stage: OrchestratorStage;
   sql?: string;
   engine?: Engine;
+  /** Which provider actually answered this step — may change between the routing call and (for insights) the narration call if server-side fallback (Phase 30) kicked in on either. */
+  provider?: ProviderId;
   result?: QueryResult;
   narrative?: string;
   statsSummary?: string;
@@ -31,7 +34,7 @@ export interface OrchestratorDeps {
     schemaDescription: string,
     previousAttempt: PreviousAttempt | null,
     history: HistoryTurn[]
-  ) => Promise<{ engine: Engine; code: string }>;
+  ) => Promise<{ engine: Engine; code: string; provider: ProviderId }>;
   runSql: (sql: string) => Promise<QueryResult>;
   runPython: (code: string) => Promise<QueryResult>;
   isDataFrameLoaded: () => boolean;
@@ -39,7 +42,7 @@ export interface OrchestratorDeps {
   /** Runs the fixed battery of real DuckDB stat queries and formats them for the narration prompt. */
   computeStatsSummary: () => Promise<string>;
   /** Narrates a question against an already-computed stats summary — never invents numbers. */
-  narrate: (question: string, statsSummary: string) => Promise<string>;
+  narrate: (question: string, statsSummary: string) => Promise<{ narrative: string; provider: ProviderId }>;
   /** Purely local/synchronous — no network call, no model, just templated real schema facts. */
   buildMetaAnswer: () => string;
 }
@@ -72,10 +75,12 @@ export async function* runQueryWithRetries(
 
     let engine: Engine;
     let code: string;
+    let routingProvider: ProviderId;
     try {
       const generated = await deps.generateQuery(question, schemaDescription, previousAttempt, history);
       engine = generated.engine;
       code = generated.code;
+      routingProvider = generated.provider;
     } catch (err) {
       // A failure to even reach the LLM isn't something retrying will fix —
       // fail immediately rather than burning more calls on a problem that
@@ -84,7 +89,7 @@ export async function* runQueryWithRetries(
       return;
     }
 
-    yield { stage: "validating", sql: code, engine };
+    yield { stage: "validating", sql: code, engine, provider: routingProvider };
 
     if (engine === "meta") {
       // Fully synchronous and local — nothing to await, nothing that can fail.
@@ -108,8 +113,18 @@ export async function* runQueryWithRetries(
 
       yield { stage: "running-query" };
       try {
-        const narrative = await deps.narrate(question, statsSummary);
-        yield { stage: "done", narrative, statsSummary, attemptsUsed: attempt };
+        const narrated = await deps.narrate(question, statsSummary);
+        // The narration call is a SEPARATE LLM call from routing — it may
+        // have landed on a different provider if fallback kicked in on
+        // this step specifically, so this deliberately overwrites the
+        // routing provider with whichever one actually wrote the visible text.
+        yield {
+          stage: "done",
+          narrative: narrated.narrative,
+          statsSummary,
+          provider: narrated.provider,
+          attemptsUsed: attempt,
+        };
         return;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Narration failed.";

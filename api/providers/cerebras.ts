@@ -1,19 +1,20 @@
 import { ProviderError } from "./types";
 
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const CEREBRAS_API_URL = "https://api.cerebras.ai/v1/chat/completions";
 
-// llama-3.3-70b-versatile was deprecated by Groq (announced June 17 2026,
-// shuts down August 16 2026). Using their recommended replacement instead.
-const MODEL = "openai/gpt-oss-120b";
+// Same open model Groq serves, run on Cerebras's own wafer-scale hardware
+// instead — genuinely the fastest inference of the 5 providers here. Free
+// tier as of mid-2026: no card required, ~1M tokens/day.
+const MODEL = "gpt-oss-120b";
 
-export const GROQ_LABEL = "Groq — gpt-oss-120b";
+export const CEREBRAS_LABEL = "Cerebras — gpt-oss-120b";
 
-export async function callGroq(
+export async function callCerebras(
   apiKey: string,
   systemPrompt: string,
   userPrompt: string
 ): Promise<string> {
-  const res = await fetch(GROQ_API_URL, {
+  const res = await fetch(CEREBRAS_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -23,8 +24,6 @@ export async function callGroq(
       model: MODEL,
       temperature: 0,
       max_tokens: 1024,
-      reasoning_effort: "low",
-      reasoning_format: "hidden",
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },
@@ -36,13 +35,13 @@ export async function callGroq(
   if (!res.ok) {
     const errText = await res.text();
     if (res.status === 429) {
-      throw new ProviderError("Groq rate limit hit.", 429);
+      throw new ProviderError("Cerebras rate limit hit.", 429);
     }
-    throw new ProviderError(`Groq API error (${res.status}): ${errText.slice(0, 300)}`, res.status >= 500 ? 502 : res.status);
+    throw new ProviderError(`Cerebras API error (${res.status}): ${errText.slice(0, 300)}`, res.status >= 500 ? 502 : res.status);
   }
 
   const data = await res.json();
   const raw: string | undefined = data?.choices?.[0]?.message?.content;
-  if (!raw) throw new ProviderError("Groq returned an empty response.", 502);
+  if (!raw) throw new ProviderError("Cerebras returned an empty response.", 502);
   return raw;
 }

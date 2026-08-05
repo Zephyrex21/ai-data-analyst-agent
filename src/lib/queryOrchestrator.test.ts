@@ -28,7 +28,7 @@ function baseDeps(overrides: Partial<OrchestratorDeps> = {}): OrchestratorDeps {
     isDataFrameLoaded: () => true,
     loadDataFrame: vi.fn(async () => {}),
     computeStatsSummary: vi.fn(async () => "Total rows: 0"),
-    narrate: vi.fn(async () => "Nothing notable stands out."),
+    narrate: vi.fn(async () => ({ narrative: "Nothing notable stands out.", provider: "groq" as const })),
     buildMetaAnswer: vi.fn(() => "This dataset has 0 rows and 0 columns."),
     ...overrides,
   };
@@ -36,7 +36,7 @@ function baseDeps(overrides: Partial<OrchestratorDeps> = {}): OrchestratorDeps {
 
 describe("runQueryWithRetries — success path costs exactly one LLM call", () => {
   it("does not retry when the first attempt succeeds", async () => {
-    const generateQuery = vi.fn(async () => ({ engine: "sql" as const, code: "SELECT * FROM data" }));
+    const generateQuery = vi.fn(async () => ({ engine: "sql" as const, code: "SELECT * FROM data", provider: "groq" as const }));
     const runSql = vi.fn(async (): Promise<QueryResult> => ({ columns: ["x"], rows: [{ x: 1 }] }));
     const deps = baseDeps({ generateQuery, runSql });
 
@@ -71,7 +71,7 @@ describe("runQueryWithRetries — self-correction", () => {
   });
 
   it("retries on a DuckDB execution failure and succeeds on retry", async () => {
-    const generateQuery = vi.fn(async () => ({ engine: "sql" as const, code: "SELECT SUM(revenue) AS total FROM data" }));
+    const generateQuery = vi.fn(async () => ({ engine: "sql" as const, code: "SELECT SUM(revenue) AS total FROM data", provider: "groq" as const }));
     const runSql = vi
       .fn()
       .mockRejectedValueOnce(new Error("Binder Error: fake failure"))
@@ -85,7 +85,7 @@ describe("runQueryWithRetries — self-correction", () => {
   });
 
   it("stops after MAX_ATTEMPTS and reports a clean final error, never looping forever", async () => {
-    const generateQuery = vi.fn(async () => ({ engine: "sql" as const, code: "SELECT profit FROM data" }));
+    const generateQuery = vi.fn(async () => ({ engine: "sql" as const, code: "SELECT profit FROM data", provider: "groq" as const }));
     const deps = baseDeps({ generateQuery });
 
     const updates = await collect(runQueryWithRetries("q", csv, [], deps));
@@ -109,11 +109,54 @@ describe("runQueryWithRetries — LLM/network failures don't retry", () => {
   });
 });
 
+describe("runQueryWithRetries — provider propagation (Phase 30)", () => {
+  it("carries the routing call's actual provider through to a SQL turn", async () => {
+    const generateQuery = vi.fn(async () => ({
+      engine: "sql" as const,
+      code: "SELECT * FROM data",
+      provider: "cerebras" as const,
+    }));
+    const runSql = vi.fn(async (): Promise<QueryResult> => ({ columns: ["x"], rows: [{ x: 1 }] }));
+    const deps = baseDeps({ generateQuery, runSql });
+
+    const updates = await collect(runQueryWithRetries("q", csv, [], deps));
+
+    const validating = updates.find((u) => u.stage === "validating");
+    expect(validating?.provider).toBe("cerebras");
+    // SQL/Python only make ONE LLM call (routing) — no second call that
+    // could change providers, so "done" doesn't need to re-assert it; the
+    // turn-merge logic in useAskQuestion.ts preserves this earlier value.
+  });
+
+  it("uses the NARRATION call's provider for an insights turn, which can differ from the routing provider", async () => {
+    const generateQuery = vi.fn(async () => ({
+      engine: "insights" as const,
+      code: "",
+      provider: "groq" as const, // routing landed on groq...
+    }));
+    const narrate = vi.fn(async () => ({
+      narrative: "Revenue looks steady.",
+      provider: "mistral" as const, // ...but narration fell over to mistral
+    }));
+    const deps = baseDeps({ generateQuery, narrate });
+
+    const updates = await collect(runQueryWithRetries("give me an overview", csv, [], deps));
+
+    const validating = updates.find((u) => u.stage === "validating");
+    expect(validating?.provider).toBe("groq");
+
+    const done = updates[updates.length - 1];
+    expect(done.stage).toBe("done");
+    expect(done.provider).toBe("mistral");
+  });
+});
+
 describe("runQueryWithRetries — Python routing", () => {
   it("routes to Python, loads the dataframe once, and executes", async () => {
     const generateQuery = vi.fn(async () => ({
       engine: "python" as const,
       code: "result = df['revenue'].corr(df['revenue'])",
+      provider: "groq" as const,
     }));
     const runPython = vi.fn(async (): Promise<QueryResult> => ({ columns: ["result"], rows: [{ result: 1 }] }));
     const loadDataFrame = vi.fn(async () => {});
@@ -128,7 +171,7 @@ describe("runQueryWithRetries — Python routing", () => {
   });
 
   it("skips the dataframe reload when it's already loaded", async () => {
-    const generateQuery = vi.fn(async () => ({ engine: "python" as const, code: "result = 1" }));
+    const generateQuery = vi.fn(async () => ({ engine: "python" as const, code: "result = 1", provider: "groq" as const }));
     const runPython = vi.fn(async (): Promise<QueryResult> => ({ columns: ["result"], rows: [{ result: 1 }] }));
     const loadDataFrame = vi.fn(async () => {});
     const deps = baseDeps({ generateQuery, runPython, isDataFrameLoaded: () => true, loadDataFrame });
@@ -143,6 +186,7 @@ describe("runQueryWithRetries — Python routing", () => {
     const generateQuery = vi.fn(async () => ({
       engine: "python" as const,
       code: "import os\nresult = os.listdir('/')",
+      provider: "groq" as const,
     }));
     const runPython = vi.fn();
     const deps = baseDeps({ generateQuery, runPython });
@@ -156,7 +200,7 @@ describe("runQueryWithRetries — Python routing", () => {
 
 describe("runQueryWithRetries — conversation history is passed through", () => {
   it("forwards the provided history to generateQuery unchanged", async () => {
-    const generateQuery = vi.fn(async () => ({ engine: "sql" as const, code: "SELECT * FROM data" }));
+    const generateQuery = vi.fn(async () => ({ engine: "sql" as const, code: "SELECT * FROM data", provider: "groq" as const }));
     const runSql = vi.fn(async (): Promise<QueryResult> => ({ columns: ["x"], rows: [{ x: 1 }] }));
     const deps = baseDeps({ generateQuery, runSql });
     const history = [
@@ -171,7 +215,7 @@ describe("runQueryWithRetries — conversation history is passed through", () =>
 
 describe("runQueryWithRetries — meta routing", () => {
   it("answers instantly from buildMetaAnswer, with no network/execution calls at all", async () => {
-    const generateQuery = vi.fn(async () => ({ engine: "meta" as const, code: "" }));
+    const generateQuery = vi.fn(async () => ({ engine: "meta" as const, code: "", provider: "groq" as const }));
     const buildMetaAnswer = vi.fn(() => "This dataset has 100 rows and 3 columns: a, b, c.");
     const runSql = vi.fn();
     const runPython = vi.fn();
@@ -202,9 +246,9 @@ describe("runQueryWithRetries — meta routing", () => {
 
 describe("runQueryWithRetries — insights routing", () => {
   it("computes real stats first, then narrates over them, without touching SQL/Python execution", async () => {
-    const generateQuery = vi.fn(async () => ({ engine: "insights" as const, code: "" }));
+    const generateQuery = vi.fn(async () => ({ engine: "insights" as const, code: "", provider: "groq" as const }));
     const computeStatsSummary = vi.fn(async () => "Total rows: 4\n- revenue (number): min=10, max=90");
-    const narrate = vi.fn(async () => "Revenue ranges from 10 to 90 across 4 rows.");
+    const narrate = vi.fn(async () => ({ narrative: "Revenue ranges from 10 to 90 across 4 rows.", provider: "groq" as const }));
     const runSql = vi.fn();
     const runPython = vi.fn();
     const deps = baseDeps({ generateQuery, computeStatsSummary, narrate, runSql, runPython });
@@ -227,7 +271,7 @@ describe("runQueryWithRetries — insights routing", () => {
   });
 
   it("retries narration on failure and eventually reports a clean error", async () => {
-    const generateQuery = vi.fn(async () => ({ engine: "insights" as const, code: "" }));
+    const generateQuery = vi.fn(async () => ({ engine: "insights" as const, code: "", provider: "groq" as const }));
     const narrate = vi.fn().mockRejectedValue(new Error("model unavailable"));
     const deps = baseDeps({ generateQuery, narrate });
 
@@ -240,7 +284,7 @@ describe("runQueryWithRetries — insights routing", () => {
   });
 
   it("fails immediately (no retry) when computing stats itself throws", async () => {
-    const generateQuery = vi.fn(async () => ({ engine: "insights" as const, code: "" }));
+    const generateQuery = vi.fn(async () => ({ engine: "insights" as const, code: "", provider: "groq" as const }));
     const computeStatsSummary = vi.fn().mockRejectedValue(new Error("DuckDB not ready"));
     const narrate = vi.fn();
     const deps = baseDeps({ generateQuery, computeStatsSummary, narrate });
