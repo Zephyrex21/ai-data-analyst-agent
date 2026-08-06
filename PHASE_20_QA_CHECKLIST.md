@@ -65,3 +65,46 @@ worth a real pass through:
 
 This phase doesn't fully "complete" until that manual pass comes back
 clean too — the checklist above is what to run it against.
+
+---
+
+## Phase 31 — Cross-Cutting QA Pass #2 (after Phases 21-30)
+
+Ten phases of real feature work (multi-provider selection, insights, meta,
+Dev Mode, chart tweaks, session caching, 5-provider automatic failover)
+landed since the last full sweep. Same discipline as Phase 20: static code
+audit first, since this environment still has no live browser.
+
+### Bugs found and fixed this pass
+
+**1. The new model dropdown didn't close on outside click.** `ProviderSelector`
+was rebuilt as a `<details>/<summary>` dropdown, which only closes natively
+when you re-click the summary or when code explicitly closes it. Picking an
+option already closed it; clicking anywhere *else* on the page while it was
+open left it stuck open. Fixed with a document-level click listener that
+closes it if the click lands outside the element.
+
+**2. A dead `shadow-lg` utility class.** Added to the new dropdown panel for
+extra visual emphasis — except `.clay` already sets its own unlayered
+`box-shadow`, which (per the exact cascade rule documented in Engineering
+Journal entry #2) always wins over a Tailwind utility regardless of what
+gets added alongside it. Not a visible bug — the panel still had *some*
+shadow from `.clay` itself — but the class was silently doing nothing,
+which is exactly the "don't fight `.clay*` with Tailwind utilities" lesson
+from that same journal entry showing up a third time. Removed.
+
+**3. A z-index tie with the sticky Navbar.** The Navbar is `sticky z-20`;
+the new dropdown panel was also `z-20`. Not necessarily broken (DOM order
+would likely break the tie correctly in practice), but ambiguous enough —
+and cheap enough to just guarantee — that the dropdown was bumped to `z-30`
+so it's never in question which one renders on top while scrolled.
+
+### Checked and found clean
+
+- No `console.log`/`console.debug` or `TODO`/`FIXME` left in any Phase 21-30 file
+- Every new interactive element (dropdown options, follow-up chips, regenerate/copy/PNG-export buttons) has real visible text, not an icon needing a separate `aria-label`
+- Dark-mode color usage in every new component checked against the same `var(--color-*)` convention as the rest of the app — one `bg-white/20` hit in the dropdown, but it's on the solid-accent selected state, same pattern already established as correct in Phase 20
+
+### Still needs a real browser (added to the Phase 20 checklist above, not repeated here)
+
+- Whether the dropdown panel (fixed 256px wide, anchored to the right edge) stays fully on-screen at narrow mobile widths — plausible it's fine given the container's padding, not verified visually

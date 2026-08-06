@@ -1,7 +1,25 @@
 {
   "name": "ai-data-analyst-agent",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Upload a CSV, ask questions in plain English, get a real executed-and-verified answer — SQL, Python, or a narrated insight, never a guess. Client-side DuckDB + Pyodide, 5-provider LLM failover, zero server cost.",
+  "keywords": [
+    "data-analysis",
+    "llm",
+    "duckdb",
+    "pyodide",
+    "react",
+    "typescript",
+    "ai-agent",
+    "csv"
+  ],
+  "author": "Saurabh",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Zephyrex21/ai-data-analyst-agent.git"
+  },
+  "homepage": "https://ai-data-analyst-agent-one.vercel.app/",
   "type": "module",
   "scripts": {
     "dev": "vite",

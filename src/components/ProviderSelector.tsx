@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { PROVIDER_OPTIONS, type ProviderId } from "../lib/providers";
 
 interface ProviderSelectorProps {
@@ -11,10 +11,21 @@ interface ProviderSelectorProps {
 // name + model + tag each doesn't fit comfortably as inline pills. Uses
 // <details>/<summary> (same disclosure pattern already used for "show
 // code"/"show the real numbers" elsewhere) instead of a fully custom
-// listbox, closing itself via a ref once an option is picked.
+// listbox, closing itself via a ref once an option is picked — and, since
+// native <details> doesn't do this on its own, also on an outside click.
 export function ProviderSelector({ value, onChange, disabled = false }: ProviderSelectorProps) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const selected = PROVIDER_OPTIONS.find((p) => p.id === value) ?? PROVIDER_OPTIONS[0];
+
+  useEffect(() => {
+    function handleOutsideClick(e: MouseEvent) {
+      if (detailsRef.current?.open && !detailsRef.current.contains(e.target as Node)) {
+        detailsRef.current.open = false;
+      }
+    }
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
+  }, []);
 
   function handleSelect(id: ProviderId) {
     onChange(id);
@@ -37,7 +48,7 @@ export function ProviderSelector({ value, onChange, disabled = false }: Provider
         <span className="text-[var(--color-text-muted)] text-[10px]">▾</span>
       </summary>
 
-      <div className="clay absolute right-0 top-full mt-2 z-20 w-64 p-1.5 flex flex-col gap-1 shadow-lg">
+      <div className="clay absolute right-0 top-full mt-2 z-30 w-64 p-1.5 flex flex-col gap-1">
         {PROVIDER_OPTIONS.map((option) => {
           const active = option.id === value;
           return (

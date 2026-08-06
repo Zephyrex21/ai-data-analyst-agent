@@ -3,6 +3,7 @@
 [![CI](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Zephyrex21/ai-data-analyst-agent/actions/workflows/ci.yml)
 ![tests](https://img.shields.io/badge/tests-196%20passing-brightgreen)
 ![zero server cost](https://img.shields.io/badge/server%20cost-%240-blue)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 > Badge repo path assumes `Zephyrex21/ai-data-analyst-agent` — update if the actual GitHub repo name differs.
 
@@ -121,6 +122,10 @@ Push to GitHub, import the repo in Vercel, then add `GROQ_API_KEY` (required) an
 
 ## More
 
-- [`ENGINEERING_JOURNAL.md`](./ENGINEERING_JOURNAL.md) — five real bugs found and fixed during this build, and what each one actually taught
+- [`ENGINEERING_JOURNAL.md`](./ENGINEERING_JOURNAL.md) — real bugs found and fixed during this build, and what each one actually taught
 - [`demo-script.md`](./demo-script.md) — a ~60-90s shot list for a demo video
 - [`eval-set.md`](./eval-set.md) — how the prompt itself gets regression-tested
+
+## License
+
+[MIT](./LICENSE) — do whatever you want with this, no attribution required (though a star is always appreciated).
